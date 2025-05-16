@@ -1,24 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { Zap, UserPlus, Mail, Lock, User, AlertCircle } from 'lucide-react';
 import Button from '../components/ui/Button';
+import { useAuth } from '../context/AuthContext';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
+  const { register, error: authError, isAuthenticated, loading, clearError } = useAuth();
+  
   const [formData, setFormData] = useState({
     fullName: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: '',
   });
+  
   const [errors, setErrors] = useState({
     fullName: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: '',
     general: '',
   });
+
+  // Redirect if user is already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
+  // Update general error from auth context
+  useEffect(() => {
+    if (authError) {
+      setErrors(prev => ({ ...prev, general: authError }));
+    }
+  }, [authError]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -33,6 +53,10 @@ const RegisterPage: React.FC = () => {
         [name]: '',
       });
     }
+    if (errors.general) {
+      setErrors(prev => ({ ...prev, general: '' }));
+      clearError();
+    }
   };
 
   const validateForm = () => {
@@ -41,6 +65,11 @@ const RegisterPage: React.FC = () => {
 
     if (!formData.fullName.trim()) {
       newErrors.fullName = 'Full name is required';
+      isValid = false;
+    }
+
+    if (!formData.username) {
+      newErrors.username = 'Username is required';
       isValid = false;
     }
 
@@ -72,13 +101,27 @@ const RegisterPage: React.FC = () => {
     return isValid;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      // Here you would handle the registration logic with your backend
-      console.log('Registration data:', formData);
-      // For now, just navigate to the dashboard as a demonstration
-      navigate('/dashboard');
+      // Split full name into first and last name
+      const nameParts = formData.fullName.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      try {
+        await register({
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+          password2: formData.confirmPassword,
+          first_name: firstName,
+          last_name: lastName
+        });
+        // Navigation is handled by the useEffect when isAuthenticated changes
+      } catch (err) {
+        // Error handling is done in the auth context
+      }
     }
   };
 
@@ -148,6 +191,35 @@ const RegisterPage: React.FC = () => {
               {errors.fullName && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center">
                   <AlertCircle className="w-4 h-4 mr-1" /> {errors.fullName}
+                </p>
+              )}
+            </div>
+
+            {/* Username field */}
+            <div>
+              <label htmlFor="username" className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-1">
+                Username
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <User className="h-5 w-5 text-dark-400" />
+                </div>
+                <input
+                  id="username"
+                  name="username"
+                  type="text"
+                  autoComplete="username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  className={`appearance-none relative block w-full px-3 py-3 pl-10 border ${
+                    errors.username ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-dark-600'
+                  } rounded-xl placeholder-gray-400 dark:placeholder-dark-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 bg-white dark:bg-dark-700 text-dark-900 dark:text-white transition-colors`}
+                  placeholder="johndoe"
+                />
+              </div>
+              {errors.username && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-1" /> {errors.username}
                 </p>
               )}
             </div>
@@ -247,8 +319,9 @@ const RegisterPage: React.FC = () => {
               size="lg"
               fullWidth
               icon={<UserPlus className="w-5 h-5" />}
+              disabled={loading}
             >
-              Register
+              {loading ? 'Creating account...' : 'Create Account'}
             </Button>
             
             <div className="mt-4 relative">
@@ -275,7 +348,7 @@ const RegisterPage: React.FC = () => {
                   <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z" />
                 </g>
               </svg>
-              Register with Google
+              Sign up with Google
             </button>
           </div>
         </form>

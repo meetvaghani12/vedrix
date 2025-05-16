@@ -1,20 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
 import { Zap, LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
 import Button from '../components/ui/Button';
+import { useAuth } from '../context/AuthContext';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const { login, error: authError, isAuthenticated, loading, clearError } = useAuth();
+  
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: '',
   });
   const [errors, setErrors] = useState({
-    email: '',
+    username: '',
     password: '',
     general: '',
   });
+
+  // Redirect if user is already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
+  // Update general error from auth context
+  useEffect(() => {
+    if (authError) {
+      setErrors(prev => ({ ...prev, general: authError }));
+    }
+  }, [authError]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -29,17 +46,18 @@ const LoginPage: React.FC = () => {
         [name]: '',
       });
     }
+    if (errors.general) {
+      setErrors(prev => ({ ...prev, general: '' }));
+      clearError();
+    }
   };
 
   const validateForm = () => {
     let isValid = true;
     const newErrors = { ...errors };
 
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-      isValid = false;
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
+    if (!formData.username) {
+      newErrors.username = 'Username is required';
       isValid = false;
     }
 
@@ -52,13 +70,15 @@ const LoginPage: React.FC = () => {
     return isValid;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (validateForm()) {
-      // Here you would handle the login logic with your backend
-      console.log('Login data:', formData);
-      // For now, just navigate to the dashboard as a demonstration
-      navigate('/dashboard');
+      try {
+        await login(formData.username, formData.password);
+        // Navigate is handled by the useEffect when isAuthenticated changes
+      } catch (err) {
+        // Error handling is done in the auth context
+      }
     }
   };
 
@@ -104,29 +124,29 @@ const LoginPage: React.FC = () => {
           
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-1">
-                Email Address
+              <label htmlFor="username" className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-1">
+                Username
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-dark-400" />
                 </div>
                 <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  value={formData.email}
+                  id="username"
+                  name="username"
+                  type="text"
+                  autoComplete="username"
+                  value={formData.username}
                   onChange={handleChange}
                   className={`appearance-none relative block w-full px-3 py-3 pl-10 border ${
-                    errors.email ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-dark-600'
+                    errors.username ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-dark-600'
                   } rounded-xl placeholder-gray-400 dark:placeholder-dark-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:focus:ring-primary-400 dark:focus:border-primary-400 bg-white dark:bg-dark-700 text-dark-900 dark:text-white transition-colors`}
-                  placeholder="you@example.com"
+                  placeholder="your username"
                 />
               </div>
-              {errors.email && (
+              {errors.username && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center">
-                  <AlertCircle className="w-4 h-4 mr-1" /> {errors.email}
+                  <AlertCircle className="w-4 h-4 mr-1" /> {errors.username}
                 </p>
               )}
             </div>
@@ -185,8 +205,9 @@ const LoginPage: React.FC = () => {
               size="lg"
               fullWidth
               icon={<LogIn className="w-5 h-5" />}
+              disabled={loading}
             >
-              Sign In
+              {loading ? 'Signing in...' : 'Sign In'}
             </Button>
             
             <div className="mt-4 relative">
