@@ -17,9 +17,11 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   login: (username: string, password: string) => Promise<void>;
-  register: (userData: RegisterData) => Promise<void>;
+  register: (userData: RegisterData) => Promise<{ requires_verification: boolean; email: string } | void>;
   logout: () => Promise<void>;
   clearError: () => void;
+  verifyOTP: (otp: string, email: string) => Promise<void>;
+  resendOTP: (email: string) => Promise<void>;
 }
 
 interface RegisterData {
@@ -101,12 +103,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         localStorage.setItem('token', data.token);
         setToken(data.token);
         // We'll load the full user profile in the useEffect
+        return;
+      } else if (response.status === 403 && data.requires_verification) {
+        // User needs to verify email
+        setError('Email verification required. Please check your email for the verification code.');
+        throw new Error('Email verification required');
       } else {
         setError(data.error || 'Login failed');
+        throw new Error(data.error || 'Login failed');
       }
     } catch (err) {
-      console.error('Login error:', err);
-      setError('An error occurred during login');
+      if ((err as Error).message !== 'Email verification required') {
+        console.error('Login error:', err);
+        setError('An error occurred during login');
+      }
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -129,9 +140,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const data = await response.json();
 
       if (response.ok) {
-        localStorage.setItem('token', data.token);
-        setToken(data.token);
-        // We'll load the full user profile in the useEffect
+        if (data.requires_verification) {
+          // Return data to redirect to verification page
+          return {
+            requires_verification: true,
+            email: userData.email
+          };
+        } else {
+          // If somehow no verification is required, set token
+          localStorage.setItem('token', data.token);
+          setToken(data.token);
+        }
       } else {
         // Handle validation errors and other error responses
         if (typeof data === 'object') {
@@ -147,10 +166,80 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } else {
           setError('Registration failed');
         }
+        throw new Error('Registration failed');
       }
     } catch (err) {
       console.error('Registration error:', err);
-      setError('An error occurred during registration');
+      if (!(err instanceof Error && err.message === 'Registration failed')) {
+        setError('An error occurred during registration');
+      }
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Verify OTP function
+  const verifyOTP = async (otp: string, email: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`${API_URL}/verify-otp/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ otp, email })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem('token', data.token);
+        setToken(data.token);
+        // The user will be loaded in the useEffect
+      } else {
+        setError(data.error || 'Verification failed');
+        throw new Error(data.error || 'Verification failed');
+      }
+    } catch (err) {
+      if (!(err instanceof Error && err.message === 'Verification failed')) {
+        console.error('OTP verification error:', err);
+        setError('An error occurred during verification');
+      }
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Resend OTP function
+  const resendOTP = async (email: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`${API_URL}/resend-otp/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to resend verification code');
+        throw new Error(data.error || 'Failed to resend verification code');
+      }
+    } catch (err) {
+      if (!(err instanceof Error && err.message === 'Failed to resend verification code')) {
+        console.error('Resend OTP error:', err);
+        setError('An error occurred while resending the verification code');
+      }
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -195,6 +284,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         register,
         logout,
         clearError,
+        verifyOTP,
+        resendOTP,
       }}
     >
       {children}

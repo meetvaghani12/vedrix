@@ -2,4 +2,6 @@ Django>=5.2.1
 djangorestframework>=3.16.0
 django-cors-headers>=4.7.0
 coreapi>=2.3.3  # For API documentation
-Markdown>=3.5.2 
+Markdown>=3.5.2
+pyotp>=2.9.0  # For OTP generation
+python-decouple>=3.8  # For environment variables handling 

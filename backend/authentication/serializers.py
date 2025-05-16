@@ -1,12 +1,14 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
-from .models import UserProfile
+from .models import UserProfile, OTPVerification
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    is_email_verified = serializers.BooleanField(read_only=True)
+    
     class Meta:
         model = UserProfile
-        fields = ['date_joined']
+        fields = ['date_joined', 'is_email_verified']
 
 class UserSerializer(serializers.ModelSerializer):
     profile = UserProfileSerializer(read_only=True)
@@ -56,4 +58,11 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(required=True, write_only=True)
     
     def validate(self, attrs):
-        return attrs 
+        return attrs
+
+class OTPVerificationSerializer(serializers.Serializer):
+    otp = serializers.CharField(max_length=6, min_length=6, required=True)
+    email = serializers.EmailField(required=True)
+
+class ResendOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True) 

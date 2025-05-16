@@ -110,7 +110,7 @@ const RegisterPage: React.FC = () => {
       const lastName = nameParts.slice(1).join(' ') || '';
       
       try {
-        await register({
+        const result = await register({
           username: formData.username,
           email: formData.email,
           password: formData.password,
@@ -118,7 +118,13 @@ const RegisterPage: React.FC = () => {
           first_name: firstName,
           last_name: lastName
         });
-        // Navigation is handled by the useEffect when isAuthenticated changes
+        
+        // Check if verification is required
+        if (result && result.requires_verification) {
+          // Navigate to verification page with email
+          navigate('/verify-email', { state: { email: formData.email } });
+        }
+        // If verification is not required, useEffect will handle navigation
       } catch (err) {
         // Error handling is done in the auth context
       }

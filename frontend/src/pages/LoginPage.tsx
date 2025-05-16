@@ -18,6 +18,9 @@ const LoginPage: React.FC = () => {
     password: '',
     general: '',
   });
+  
+  const [verificationRequired, setVerificationRequired] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
 
   // Redirect if user is already authenticated
   useEffect(() => {
@@ -25,6 +28,13 @@ const LoginPage: React.FC = () => {
       navigate('/dashboard');
     }
   }, [isAuthenticated, navigate]);
+
+  // If email verification is required, navigate to verification page
+  useEffect(() => {
+    if (verificationRequired && userEmail) {
+      navigate('/verify-email', { state: { email: userEmail } });
+    }
+  }, [verificationRequired, userEmail, navigate]);
 
   // Update general error from auth context
   useEffect(() => {
@@ -75,9 +85,22 @@ const LoginPage: React.FC = () => {
     if (validateForm()) {
       try {
         await login(formData.username, formData.password);
-        // Navigate is handled by the useEffect when isAuthenticated changes
+        // Navigation is handled by the useEffect when isAuthenticated changes
       } catch (err) {
-        // Error handling is done in the auth context
+        // Check if verification is required (this error is set by the login function)
+        const errorMessage = (err as Error).message || '';
+        if (errorMessage === 'Email verification required') {
+          // If we know the user's email (from the login response), direct to verification
+          const userByUsername = await fetch(`/api/user-by-username/?username=${formData.username}`, {
+            method: 'GET',
+          }).then(res => res.json());
+          
+          if (userByUsername && userByUsername.email) {
+            setUserEmail(userByUsername.email);
+            setVerificationRequired(true);
+          }
+        }
+        // Other errors are handled in the auth context
       }
     }
   };
