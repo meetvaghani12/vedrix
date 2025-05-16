@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import Footer from './Footer';
+import BackButton from './BackButton';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const Layout: React.FC = () => {
@@ -11,6 +12,7 @@ const Layout: React.FC = () => {
   return (
     <div className="flex flex-col min-h-screen">
       {isHomePage && <Navbar />}
+      {!isHomePage && <BackButton />}
       <main className="flex-grow">
         <AnimatePresence mode="wait">
           <motion.div
