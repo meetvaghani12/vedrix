@@ -59,7 +59,7 @@ const CtaSection: React.FC = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
             viewport={{ once: true }}
           >
-            <Link to="/upload">
+            <Link to="/register">
               <Button 
                 variant="primary" 
                 size="lg" 

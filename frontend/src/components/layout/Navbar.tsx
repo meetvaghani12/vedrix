@@ -80,10 +80,10 @@ const Navbar: React.FC = () => {
               whileTap={{ scale: 0.95 }}
               className="ml-4 px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-500 text-white rounded-full font-medium shadow-lg hover:shadow-xl transition-all duration-300"
             >
-              <span className="flex items-center">
+              <Link to="/register" className="flex items-center text-white">
                 <Zap className="w-4 h-4 mr-2" />
                 Get Started
-              </span>
+              </Link>
             </motion.button>
             <button
               onClick={toggleTheme}
@@ -134,7 +134,7 @@ const Navbar: React.FC = () => {
             ))}
             <div className="pt-4">
               <Link
-                to="/dashboard"
+                to="/register"
                 className="block w-full px-4 py-3 bg-gradient-to-r from-primary-500 to-accent-500 text-white text-center rounded-xl font-medium shadow-lg"
                 onClick={() => setIsMenuOpen(false)}
               >

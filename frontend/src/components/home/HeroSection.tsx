@@ -66,7 +66,7 @@ const HeroSection: React.FC = () => {
             variants={itemVariants}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16"
           >
-            <Link to="/upload">
+            <Link to="/register">
               <Button 
                 variant="primary" 
                 size="lg" 

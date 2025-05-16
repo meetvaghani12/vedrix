@@ -9,6 +9,8 @@ import PricingPage from './pages/PricingPage';
 import SecurityPage from './pages/SecurityPage';
 import ContactPage from './pages/ContactPage';
 import NotFoundPage from './pages/NotFoundPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import BackgroundParticles from './components/ui/BackgroundParticles';
 
 function App() {
@@ -24,6 +26,8 @@ function App() {
           <Route path="pricing" element={<PricingPage />} />
           <Route path="security" element={<SecurityPage />} />
           <Route path="contact" element={<ContactPage />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="register" element={<RegisterPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
