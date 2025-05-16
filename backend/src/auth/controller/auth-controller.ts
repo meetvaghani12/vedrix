@@ -11,7 +11,7 @@ import {
   createUser, 
   updateUser, 
   getUserWithPreferences 
-} from './../db/user';
+} from '../db/user';
 
 const prisma = new PrismaClient();
 

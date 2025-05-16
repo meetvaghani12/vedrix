@@ -8,15 +8,15 @@ import {
   forgotPassword,
   resetPassword,
   logout,
-} from './../controller/auth-controller';
+} from '../controller/auth-controller';
 import {
   validateRequest,
   registrationValidationRules,
   loginValidationRules,
   otpValidationRules,
   passwordResetValidationRules,
-} from './../middleware/validate.middleware';
-import { authenticate } from './../middleware/auth.middleware';
+} from '../middleware/validate.middleware';
+import { authenticate } from '../middleware/auth.middleware';
 
 const router = express.Router();
 
