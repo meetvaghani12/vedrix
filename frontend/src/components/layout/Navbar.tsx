@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Shield, Zap, LogOut } from 'lucide-react';
+import { Menu, X, Shield, Zap, LogOut, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -11,7 +11,7 @@ const Navbar: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme } = useTheme();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, user } = useAuth();
 
   const navLinks = [
     { name: 'Features', path: '/#features' },
@@ -44,7 +44,16 @@ const Navbar: React.FC = () => {
 
   const handleLogout = async () => {
     await logout();
+    // Clear userMode when logging out
+    localStorage.removeItem('userMode');
     navigate('/');
+  };
+
+  const handleSwitchToAdmin = () => {
+    localStorage.setItem('userMode', 'admin');
+    // Dispatch storage event to notify other components
+    window.dispatchEvent(new Event('storage'));
+    navigate('/admin');
   };
 
   return (
@@ -92,15 +101,28 @@ const Navbar: React.FC = () => {
           {/* Right Side Controls */}
           <div className="hidden md:flex items-center space-x-4">
             {isAuthenticated ? (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleLogout}
-                className="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-500 text-white rounded-full font-medium shadow-lg hover:shadow-xl transition-all duration-300 flex items-center"
-              >
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </motion.button>
+              <div className="flex items-center space-x-3">
+                {user?.isAdmin && (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleSwitchToAdmin}
+                    className="px-4 py-2 border-2 border-primary-500 text-primary-500 dark:text-primary-400 dark:border-primary-400 rounded-full font-medium transition-all duration-300 flex items-center"
+                  >
+                    <Shield className="w-4 h-4 mr-2" />
+                    Admin Mode
+                  </motion.button>
+                )}
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleLogout}
+                  className="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-500 text-white rounded-full font-medium shadow-lg hover:shadow-xl transition-all duration-300 flex items-center"
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </motion.button>
+              </div>
             ) : (
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -146,7 +168,21 @@ const Navbar: React.FC = () => {
                 {link.name}
               </Link>
             ))}
-            <div className="pt-4">
+            <div className="pt-4 space-y-3">
+              {isAuthenticated && user?.isAdmin && (
+                <button
+                  onClick={() => {
+                    handleSwitchToAdmin();
+                    setIsMenuOpen(false);
+                  }}
+                  className="block w-full px-4 py-3 border-2 border-primary-500 text-primary-500 dark:text-primary-400 dark:border-primary-400 text-center rounded-xl font-medium"
+                >
+                  <span className="flex items-center justify-center">
+                    <Shield className="w-4 h-4 mr-2" />
+                    Admin Mode
+                  </span>
+                </button>
+              )}
               {isAuthenticated ? (
                 <button
                   onClick={() => {

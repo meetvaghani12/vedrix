@@ -7,6 +7,7 @@ interface User {
   email: string;
   first_name: string;
   last_name: string;
+  isAdmin?: boolean;
 }
 
 // Define the structure of our auth context
@@ -63,7 +64,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
           if (response.ok) {
             const userData = await response.json();
-            setUser(userData);
+            // Set isAdmin flag based on is_staff or is_superuser
+            setUser({
+              ...userData,
+              isAdmin: userData.is_staff || userData.is_superuser
+            });
             setIsAuthenticated(true);
           } else {
             // If token is invalid, clear everything
@@ -102,6 +107,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.ok) {
         localStorage.setItem('token', data.token);
         setToken(data.token);
+        // Store the initial admin status from login response
+        if (data.is_admin) {
+          localStorage.setItem('isAdmin', 'true');
+        }
         // We'll load the full user profile in the useEffect
         return;
       } else if (response.status === 403 && data.requires_verification) {
@@ -262,6 +271,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Logout error:', err);
     } finally {
       localStorage.removeItem('token');
+      localStorage.removeItem('userMode');
+      localStorage.removeItem('isAdmin');
       setToken(null);
       setUser(null);
       setIsAuthenticated(false);

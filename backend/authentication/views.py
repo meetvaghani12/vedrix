@@ -168,6 +168,7 @@ class LoginView(APIView):
                     'user_id': user.pk,
                     'username': user.username,
                     'email': user.email,
+                    'is_admin': user.is_staff or user.is_superuser
                 }, status=status.HTTP_200_OK)
             return Response(
                 {'error': 'Invalid credentials'},

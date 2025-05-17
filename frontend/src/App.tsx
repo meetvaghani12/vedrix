@@ -1,5 +1,5 @@
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import HomePage from './pages/HomePage';
 import UploadPage from './pages/UploadPage';
@@ -15,9 +15,38 @@ import SettingsPage from './pages/SettingsPage';
 import BackgroundParticles from './components/ui/BackgroundParticles';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
+import AdminLayout from './components/layout/AdminLayout';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import UserManagementPage from './pages/admin/UserManagementPage';
+import ModeSelectionPage from './pages/ModeSelectionPage';
 
 function App() {
-  const { loading } = useAuth();
+  const { loading, user, isAuthenticated } = useAuth();
+  const [userMode, setUserMode] = useState<'user' | 'admin' | null>(null);
+
+  // Check for userMode in localStorage whenever it changes
+  useEffect(() => {
+    const handleModeChange = () => {
+      const mode = localStorage.getItem('userMode') as 'user' | 'admin' | null;
+      setUserMode(mode);
+    };
+    
+    // Initial check
+    handleModeChange();
+    
+    // Set up event listener for localStorage changes
+    window.addEventListener('storage', handleModeChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleModeChange);
+    };
+  }, []);
+  
+  // Check if the current user can access admin routes
+  const canAccessAdmin = isAuthenticated && user?.isAdmin && userMode === 'admin';
+  
+  // If the user is logged in but no mode is selected and user is admin, show mode selection
+  const shouldShowModeSelection = isAuthenticated && user?.isAdmin && !userMode;
 
   if (loading) {
     // Show a simple loading spinner while authentication state is being determined
@@ -32,7 +61,22 @@ function App() {
     <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 dark:from-dark-900 dark:to-dark-950 transition-colors duration-300 ease-in-out">
       <BackgroundParticles />
       <Routes>
-        {/* Public routes */}
+        {/* Mode Selection Route */}
+        {shouldShowModeSelection && (
+          <Route path="*" element={<Navigate to="/mode-selection" replace />} />
+        )}
+        <Route path="/mode-selection" element={<ModeSelectionPage />} />
+
+        {/* Admin Routes - Always defined but protected */}
+        <Route path="/admin" element={canAccessAdmin ? <AdminLayout /> : <Navigate to="/" replace />}>
+          <Route index element={<AdminDashboardPage />} />
+          <Route path="users" element={<UserManagementPage />} />
+          <Route path="analytics" element={<div>Analytics Page</div>} />
+          <Route path="logs" element={<div>Logs Page</div>} />
+          <Route path="settings" element={<div>Admin Settings Page</div>} />
+        </Route>
+
+        {/* Public and User Routes */}
         <Route path="/" element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="pricing" element={<PricingPage />} />
