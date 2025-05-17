@@ -18,7 +18,6 @@ const Navbar: React.FC = () => {
     { name: 'Upload', path: '/upload' },
     { name: 'Dashboard', path: '/dashboard' },
     { name: 'Pricing', path: '/pricing' },
-    { name: 'Security', path: '/security' },
     { name: 'Contact', path: '/contact' },
   ];
 
@@ -57,38 +56,54 @@ const Navbar: React.FC = () => {
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <nav className="flex items-center justify-between h-16 md:h-20">
-          {/* Logo */}
-          <Link 
-            to="/" 
-            className="flex items-center space-x-2 text-xl font-bold font-sora"
-          >
-            <Shield className="w-8 h-8 text-primary-500" />
-            <span className="bg-gradient-to-r from-primary-500 to-accent-500 bg-clip-text text-transparent">
-              Vedrix
-            </span>
-          </Link>
+          {/* Logo - Left Side */}
+          <div className="flex-shrink-0">
+            <Link 
+              to="/" 
+              className="flex items-center space-x-2 text-xl font-bold font-sora"
+            >
+              <Shield className="w-8 h-8 text-primary-500" />
+              <span className="bg-gradient-to-r from-primary-500 to-accent-500 bg-clip-text text-transparent">
+                Vedrix
+              </span>
+            </Link>
+          </div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex md:items-center md:space-x-4">
-            {navLinks.map((link) => (
-              <Link
-                key={link.name}
-                to={link.path}
-                className={`px-3 py-2 rounded-md text-sm lg:text-base font-medium transition-all duration-200
-                ${location.pathname === link.path || (link.path.includes('#') && location.pathname === '/')
-                  ? 'text-primary-500 dark:text-primary-400' 
-                  : 'text-dark-600 dark:text-dark-300 hover:text-primary-500 dark:hover:text-primary-400'
-                }`}
-              >
-                {link.name}
-              </Link>
-            ))}
+          {/* Navigation Links - Center */}
+          <div className="hidden md:flex items-center justify-center flex-1 mx-8">
+            <div className="flex space-x-6">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.name}
+                  to={link.path}
+                  className={`px-3 py-2 rounded-md text-sm lg:text-base font-medium transition-all duration-200
+                  ${location.pathname === link.path || (link.path.includes('#') && location.pathname === '/')
+                    ? 'text-primary-500 dark:text-primary-400' 
+                    : 'text-dark-600 dark:text-dark-300 hover:text-primary-500 dark:hover:text-primary-400'
+                  }`}
+                >
+                  {link.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Right Side Controls */}
+          <div className="hidden md:flex items-center space-x-4">
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full text-dark-600 dark:text-dark-300 hover:bg-gray-200 dark:hover:bg-dark-800 transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+            
             {isAuthenticated ? (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleLogout}
-                className="ml-4 px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-500 text-white rounded-full font-medium shadow-lg hover:shadow-xl transition-all duration-300 flex items-center"
+                className="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-500 text-white rounded-full font-medium shadow-lg hover:shadow-xl transition-all duration-300 flex items-center"
               >
                 <LogOut className="w-4 h-4 mr-2" />
                 Logout
@@ -97,7 +112,7 @@ const Navbar: React.FC = () => {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="ml-4 px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-500 text-white rounded-full font-medium shadow-lg hover:shadow-xl transition-all duration-300"
+                className="px-4 py-2 bg-gradient-to-r from-primary-500 to-accent-500 text-white rounded-full font-medium shadow-lg hover:shadow-xl transition-all duration-300"
               >
                 <Link to="/register" className="flex items-center text-white">
                   <Zap className="w-4 h-4 mr-2" />
@@ -105,13 +120,6 @@ const Navbar: React.FC = () => {
                 </Link>
               </motion.button>
             )}
-            <button
-              onClick={toggleTheme}
-              className="ml-2 p-2 rounded-full text-dark-600 dark:text-dark-300 hover:bg-gray-200 dark:hover:bg-dark-800 transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
           </div>
 
           {/* Mobile menu button */}
