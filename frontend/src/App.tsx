@@ -18,6 +18,9 @@ import { useAuth } from './context/AuthContext';
 import AdminLayout from './components/layout/AdminLayout';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
+import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
+import AdminLogsPage from './pages/admin/AdminLogsPage';
+import AdminSettingsPage from './pages/admin/AdminSettingsPage';
 import ModeSelectionPage from './pages/ModeSelectionPage';
 
 function App() {
@@ -71,9 +74,9 @@ function App() {
         <Route path="/admin" element={canAccessAdmin ? <AdminLayout /> : <Navigate to="/" replace />}>
           <Route index element={<AdminDashboardPage />} />
           <Route path="users" element={<UserManagementPage />} />
-          <Route path="analytics" element={<div>Analytics Page</div>} />
-          <Route path="logs" element={<div>Logs Page</div>} />
-          <Route path="settings" element={<div>Admin Settings Page</div>} />
+          <Route path="analytics" element={<AdminAnalyticsPage />} />
+          <Route path="logs" element={<AdminLogsPage />} />
+          <Route path="settings" element={<AdminSettingsPage />} />
         </Route>
 
         {/* Public and User Routes */}
