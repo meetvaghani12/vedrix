@@ -18,6 +18,7 @@ const Navbar: React.FC = () => {
     { name: 'Upload', path: '/upload' },
     { name: 'Dashboard', path: '/dashboard' },
     { name: 'Pricing', path: '/pricing' },
+    { name: 'Settings', path: '/settings' },
     { name: 'Contact', path: '/contact' },
   ];
 

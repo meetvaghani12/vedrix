@@ -11,6 +11,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import OTPVerificationPage from './pages/OTPVerificationPage';
+import SettingsPage from './pages/SettingsPage';
 import BackgroundParticles from './components/ui/BackgroundParticles';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
@@ -45,6 +46,7 @@ function App() {
             <Route path="upload" element={<UploadPage />} />
             <Route path="results" element={<ResultsPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
           
           <Route path="*" element={<NotFoundPage />} />
