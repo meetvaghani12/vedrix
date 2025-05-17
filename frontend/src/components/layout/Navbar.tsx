@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Shield, Zap, Sun, Moon, LogOut } from 'lucide-react';
+import { Menu, X, Shield, Zap, LogOut } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -10,7 +10,7 @@ const Navbar: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const { isAuthenticated, logout } = useAuth();
 
   const navLinks = [
@@ -91,14 +91,6 @@ const Navbar: React.FC = () => {
 
           {/* Right Side Controls */}
           <div className="hidden md:flex items-center space-x-4">
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-full text-dark-600 dark:text-dark-300 hover:bg-gray-200 dark:hover:bg-dark-800 transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-            
             {isAuthenticated ? (
               <motion.button
                 whileHover={{ scale: 1.05 }}
@@ -125,13 +117,6 @@ const Navbar: React.FC = () => {
 
           {/* Mobile menu button */}
           <div className="flex items-center md:hidden">
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-full text-dark-600 dark:text-dark-300 hover:bg-gray-200 dark:hover:bg-dark-800 transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
             <button
               onClick={toggleMenu}
               className="p-2 rounded-md text-dark-600 dark:text-dark-300 hover:bg-gray-200 dark:hover:bg-dark-800 transition-colors"
