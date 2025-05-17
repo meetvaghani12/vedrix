@@ -10,7 +10,7 @@ def send_otp_email(user):
     otp = OTPVerification.generate_otp()
     
     # Create OTP record
-    otp_record = OTPVerification(user=user)
+    otp_record = OTPVerification(user=user, otp_code=otp)
     otp_record.save()
     
     # Prepare email content

@@ -4,7 +4,8 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 import datetime
 from django.utils import timezone
-import pyotp
+import random
+import string
 from django.conf import settings
 
 # Create your models here.
@@ -20,6 +21,7 @@ class UserProfile(models.Model):
 class OTPVerification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='otps')
     otp_type = models.CharField(max_length=20, default='email')  # For future: 'email', 'sms', etc.
+    otp_code = models.CharField(max_length=6, null=True)  # Store the actual OTP code
     is_used = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
@@ -39,9 +41,8 @@ class OTPVerification(models.Model):
     
     @staticmethod
     def generate_otp():
-        """Generate a 6-digit OTP using pyotp"""
-        totp = pyotp.TOTP(settings.OTP_SECRET, interval=settings.OTP_EXPIRY_MINUTES * 60)
-        return totp.now()
+        """Generate a 6-digit OTP without using pyotp"""
+        return ''.join(random.choices(string.digits, k=6))
     
     @staticmethod
     def verify_otp(otp, user, otp_type='email'):
@@ -55,9 +56,8 @@ class OTPVerification(models.Model):
                 expires_at__gt=timezone.now()
             ).latest('created_at')
             
-            # Verify the OTP
-            totp = pyotp.TOTP(settings.OTP_SECRET, interval=settings.OTP_EXPIRY_MINUTES * 60)
-            is_valid = totp.verify(otp, for_time=verification.created_at.timestamp())
+            # Simple string comparison using the stored OTP code
+            is_valid = (otp == verification.otp_code)
             
             if is_valid:
                 verification.is_used = True
