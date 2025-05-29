@@ -1,8 +1,45 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Download, MessageSquare, RotateCcw, Bookmark, BookOpen, FileText } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import { useNavigate } from 'react-router-dom';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+
+// Helper function for PDF text wrapping
+const addWrappedText = (pdf: jsPDF, text: string, x: number, y: number, maxWidth: number, lineHeight: number): number => {
+  const lines = pdf.splitTextToSize(text, maxWidth);
+  pdf.text(lines, x, y);
+  return y + (lines.length * lineHeight);
+};
+
+// Helper function to process text for PDF display
+const processTextForPDF = (text: string): string => {
+  // Replace HTML entities
+  let processedText = text.replace(/&nbsp;/g, ' ')
+                         .replace(/&amp;/g, '&')
+                         .replace(/&lt;/g, '<')
+                         .replace(/&gt;/g, '>')
+                         .replace(/&quot;/g, '"')
+                         .replace(/&#39;/g, "'");
+  
+  // Normalize line breaks
+  processedText = processedText.replace(/\r\n/g, '\n');
+  processedText = processedText.replace(/\r/g, '\n');
+  
+  // Ensure paragraph breaks are preserved with double line breaks
+  processedText = processedText.replace(/\n\s*\n/g, '\n\n');
+  
+  // Remove excessive whitespace
+  processedText = processedText.replace(/[ \t]+/g, ' ');
+  processedText = processedText.replace(/^\s+/gm, ''); // Remove leading spaces on each line
+  
+  // Ensure there's a space after each sentence period for readability
+  processedText = processedText.replace(/\.([A-Z])/g, '. $1');
+  
+  return processedText;
+};
 
 interface Source {
   id: number;
@@ -13,12 +50,15 @@ interface Source {
 }
 
 const ResultsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [originalText, setOriginalText] = useState<string>('');
   const [sources, setSources] = useState<Source[]>([]);
   const [overallScore, setOverallScore] = useState<number>(0);
   const [selectedSource, setSelectedSource] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [originalFilename, setOriginalFilename] = useState<string>('');
+  const reportRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
 
   // Load data from session storage or use simulated data
   useEffect(() => {
@@ -207,6 +247,374 @@ const ResultsPage: React.FC = () => {
     return "Smith, J. (2023). Academic Analysis and Insights. Journal of Research, 15(2), 45-67.";
   };
 
+  const handleRescan = () => {
+    // Navigate back to the upload page
+    navigate('/upload');
+  };
+
+  const handleDownloadReport = async () => {
+    setIsGeneratingPDF(true);
+    
+    try {
+      // Create a new jsPDF instance
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // Define constants for positioning
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const margin = 20;
+      const contentWidth = pageWidth - (margin * 2);
+      
+      // Add header with logo and title
+      pdf.setFillColor(42, 72, 120); // Dark blue header
+      pdf.rect(0, 0, pageWidth, 35, 'F');
+      
+      // Title
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(24);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Originality Report', margin, 22);
+      
+      // First page: Document information
+      let yPos = 50;
+      
+      // Document info section
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(18);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Document Information', margin, yPos);
+      yPos += 10;
+      
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 10;
+      
+      // Document details
+      pdf.setFontSize(12);
+      pdf.setFont('helvetica', 'normal');
+      
+      const details = [
+        { label: 'File Name:', value: originalFilename || 'Document' },
+        { label: 'Submission Date:', value: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString() },
+        { label: 'Word Count:', value: getWordCount(originalText).toString() },
+        { label: 'Originality Score:', value: `${overallScore}%` },
+        { label: 'Similarity Score:', value: `${100 - overallScore}%` },
+        { label: 'Matched Sources:', value: sources.length.toString() }
+      ];
+      
+      details.forEach(detail => {
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(detail.label, margin, yPos);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(detail.value, margin + 50, yPos);
+        yPos += 8;
+      });
+      
+      yPos += 10;
+      
+      // Score visualization
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Originality Score', margin, yPos);
+      yPos += 10;
+      
+      // Draw score bar
+      const barWidth = 150;
+      const barHeight = 15;
+      const barX = margin;
+      const barY = yPos;
+      
+      // Background bar
+      pdf.setFillColor(220, 220, 220);
+      pdf.rect(barX, barY, barWidth, barHeight, 'F');
+      
+      // Score bar
+      const scoreColor = overallScore > 80 ? [0, 176, 116] : overallScore > 50 ? [245, 158, 11] : [239, 68, 68];
+      pdf.setFillColor(scoreColor[0], scoreColor[1], scoreColor[2]);
+      pdf.rect(barX, barY, barWidth * (overallScore / 100), barHeight, 'F');
+      
+      // Score text
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(10);
+      pdf.text(`${overallScore}%`, barX + (barWidth * (overallScore / 100)) - 10, barY + barHeight - 4);
+      
+      yPos += barHeight + 15;
+      
+      // Summary text
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Summary', margin, yPos);
+      yPos += 10;
+      
+      pdf.setFontSize(11);
+      pdf.setFont('helvetica', 'normal');
+      
+      const summaryText = `This document has an originality score of ${overallScore}%. ${
+        overallScore > 80 
+          ? 'The document appears to be mostly original with minimal matched content.'
+          : overallScore > 50
+            ? 'The document contains some matched content that may require review or citation.'
+            : 'The document contains significant matched content that requires extensive review and citation.'
+      }`;
+      
+      yPos = addWrappedText(pdf, summaryText, margin, yPos, contentWidth, 6) + 10;
+      
+      // Add document text in the next page
+      pdf.addPage();
+      
+      // Header for document text
+      pdf.setFillColor(42, 72, 120);
+      pdf.rect(0, 0, pageWidth, 35, 'F');
+      
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(24);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Document Content', margin, 22);
+      
+      // Add document name in smaller text
+      pdf.setFontSize(12);
+      pdf.text(originalFilename || 'Document', pageWidth - margin, 22, { align: 'right' });
+      
+      yPos = 50;
+      
+      // Document text section
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(18);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Full Text', margin, yPos);
+      yPos += 10;
+      
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 10;
+      
+      // Document content
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      
+      // Process the text to ensure proper formatting
+      const documentText = processTextForPDF(originalText);
+      
+      // Create a function to add text with pagination
+      const addDocumentText = (text: string, startY: number) => {
+        let currentY = startY;
+        let remainingText = text;
+        let pageNum = 1;
+        
+        // Set up max height per page
+        const maxY = pdf.internal.pageSize.getHeight() - 40; // Leave space for footer
+        
+        // Add text until all text is added
+        while (remainingText.length > 0) {
+          // Calculate how much text can fit on this page
+          const textToFit = remainingText;
+          const lineHeight = 5;
+          const lines = pdf.splitTextToSize(textToFit, contentWidth);
+          
+          // Calculate how many lines can fit on current page
+          const availableHeight = maxY - currentY;
+          const maxLines = Math.floor(availableHeight / lineHeight);
+          const linesForPage = lines.slice(0, maxLines);
+          
+          // Add the lines that fit on this page
+          if (linesForPage.length > 0) {
+            // Add each line with proper spacing
+            for (let i = 0; i < linesForPage.length; i++) {
+              pdf.text(linesForPage[i], margin, currentY);
+              currentY += lineHeight;
+            }
+          }
+          
+          // Check if we've used all lines or have more remaining
+          if (linesForPage.length < lines.length) {
+            // We have more text that didn't fit
+            remainingText = lines.slice(linesForPage.length).join(' ');
+          } else {
+            // All text has been processed
+            remainingText = '';
+          }
+          
+          // If there's more text, add a new page
+          if (remainingText.length > 0) {
+            pdf.addPage();
+            pageNum++;
+            
+            // Add header to new page
+            pdf.setFillColor(42, 72, 120);
+            pdf.rect(0, 0, pageWidth, 35, 'F');
+            
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(24);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('Document Content (continued)', margin, 22);
+            
+            // Add document name in smaller text
+            pdf.setFontSize(12);
+            pdf.text(originalFilename || 'Document', pageWidth - margin, 22, { align: 'right' });
+            
+            // Reset Y position for new page
+            currentY = 50;
+            
+            // Add section header to new page
+            pdf.setTextColor(0, 0, 0);
+            pdf.setFontSize(14);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('Full Text (continued)', margin, currentY);
+            currentY += 10;
+            
+            pdf.setDrawColor(200, 200, 200);
+            pdf.line(margin, currentY, pageWidth - margin, currentY);
+            currentY += 10;
+            
+            // Reset font for content
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'normal');
+          }
+        }
+        
+        return currentY;
+      };
+      
+      // Start adding document text
+      yPos = addDocumentText(documentText, yPos);
+      
+      // Add source matches in the next page
+      pdf.addPage();
+      
+      // Header for matches
+      pdf.setFillColor(42, 72, 120);
+      pdf.rect(0, 0, pageWidth, 35, 'F');
+      
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(24);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Matched Sources', margin, 22);
+      
+      yPos = 50;
+      
+      // Matches section
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(18);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Source Details', margin, yPos);
+      yPos += 10;
+      
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 10;
+      
+      // List each source and its matches
+      if (sources.length === 0) {
+        pdf.setFontSize(11);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text('No matched sources found.', margin, yPos);
+      } else {
+        sources.forEach((source, index) => {
+          // Source header
+          pdf.setFontSize(14);
+          pdf.setFont('helvetica', 'bold');
+          
+          // Set color based on match percentage
+          const sourceColor = source.matchPercentage > 20 ? [239, 68, 68] : source.matchPercentage > 10 ? [245, 158, 11] : [0, 176, 116];
+          pdf.setTextColor(sourceColor[0], sourceColor[1], sourceColor[2]);
+          
+          pdf.text(`Source ${index + 1}: ${source.matchPercentage}% match`, margin, yPos);
+          yPos += 8;
+          
+          // Source details
+          pdf.setTextColor(0, 0, 0);
+          pdf.setFontSize(11);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('Title:', margin, yPos);
+          pdf.setFont('helvetica', 'normal');
+          yPos = addWrappedText(pdf, source.title, margin + 30, yPos, contentWidth - 30, 5) + 5;
+          
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('URL:', margin, yPos);
+          pdf.setFont('helvetica', 'normal');
+          yPos = addWrappedText(pdf, source.url, margin + 30, yPos, contentWidth - 30, 5) + 5;
+          
+          // Matched text
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('Matched Text:', margin, yPos);
+          yPos += 8;
+          
+          pdf.setFont('helvetica', 'normal');
+          source.matchedText.forEach((match, i) => {
+            if (match && match.trim()) {
+              // Process match text for better display
+              const processedMatch = processTextForPDF(match);
+              
+              pdf.setFillColor(255, 240, 240); // Light red background
+              
+              // Get text dimensions for the background
+              const lines = pdf.splitTextToSize(processedMatch, contentWidth - 10);
+              const textHeight = lines.length * 5;
+              
+              // Draw background
+              pdf.rect(margin + 5, yPos - 4, contentWidth - 10, textHeight + 6, 'F');
+              
+              // Add matched text
+              yPos = addWrappedText(pdf, `${i + 1}. "${processedMatch}"`, margin + 10, yPos, contentWidth - 20, 5) + 8;
+            }
+          });
+          
+          yPos += 5;
+          
+          // Add separator between sources
+          if (index < sources.length - 1) {
+            pdf.setDrawColor(200, 200, 200);
+            pdf.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 10;
+          }
+          
+          // Check if we need a new page
+          if (yPos > pdf.internal.pageSize.getHeight() - 30 && index < sources.length - 1) {
+            pdf.addPage();
+            
+            // Header for new page
+            pdf.setFillColor(42, 72, 120);
+            pdf.rect(0, 0, pageWidth, 35, 'F');
+            
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(24);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('Matched Sources (continued)', margin, 22);
+            
+            yPos = 50;
+          }
+        });
+      }
+      
+      // Add footer to all pages
+      const totalPages = pdf.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        
+        // Footer line
+        pdf.setDrawColor(200, 200, 200);
+        pdf.line(margin, 280, pageWidth - margin, 280);
+        
+        // Footer text
+        pdf.setFontSize(8);
+        pdf.setTextColor(100, 100, 100);
+        pdf.text(`Generated by Vedrix | Page ${i} of ${totalPages} | ${new Date().toISOString().split('T')[0]}`, pageWidth / 2, 287, { align: 'center' });
+      }
+      
+      // Save the PDF
+      pdf.save(`${originalFilename ? originalFilename.split('.')[0] : 'document'}_report.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF report. Please try again.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-[600px] flex items-center justify-center">
@@ -237,7 +645,7 @@ const ResultsPage: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Main content area */}
-          <div className="lg:col-span-8">
+          <div className="lg:col-span-8" ref={reportRef}>
             <Card variant="glass" className="p-6 mb-6">
               <div className="flex flex-wrap items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-dark-800 dark:text-dark-200">
@@ -248,13 +656,16 @@ const ResultsPage: React.FC = () => {
                     variant="outline" 
                     size="sm" 
                     icon={<Download className="w-4 h-4" />}
+                    onClick={handleDownloadReport}
+                    disabled={isGeneratingPDF}
                   >
-                    Download Report
+                    {isGeneratingPDF ? 'Generating...' : 'Download Report'}
                   </Button>
                   <Button 
                     variant="ghost" 
                     size="sm" 
                     icon={<RotateCcw className="w-4 h-4" />}
+                    onClick={handleRescan}
                   >
                     Rescan
                   </Button>
@@ -403,7 +814,7 @@ const ResultsPage: React.FC = () => {
                   </li>
                   <li className="flex justify-between">
                     <span>Matched Words:</span>
-                    <span className="font-medium text-dark-700 dark:text-dark-300">187</span>
+                    <span className="font-medium text-dark-700 dark:text-dark-300">{Math.floor(getWordCount(originalText) * (100 - overallScore) / 100)}</span>
                   </li>
                   <li className="flex justify-between">
                     <span>Plagiarism Score:</span>
