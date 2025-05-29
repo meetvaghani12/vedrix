@@ -18,12 +18,18 @@ const ResultsPage: React.FC = () => {
   const [overallScore, setOverallScore] = useState<number>(0);
   const [selectedSource, setSelectedSource] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [originalFilename, setOriginalFilename] = useState<string>('');
 
   // Load data from session storage or use simulated data
   useEffect(() => {
     const timer = setTimeout(() => {
       // Try to get extracted text from session storage
       const extractedText = sessionStorage.getItem('extractedText');
+      const filename = sessionStorage.getItem('originalFilename');
+      
+      if (filename) {
+        setOriginalFilename(filename);
+      }
       
       // If we have extracted text from the upload, use it
       if (extractedText) {
@@ -149,12 +155,56 @@ const ResultsPage: React.FC = () => {
       if (match && originalText.includes(match)) {
         highlightedText = highlightedText.replace(
           match,
-          `<span class="bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 px-1 rounded">${match}</span>`
+          `<span class="bg-accent-100 dark:bg-accent-900/50 text-accent-800 dark:text-accent-100 px-1 rounded">${match}</span>`
         );
       }
     });
     
     return highlightedText;
+  };
+
+  const getWordCount = (text: string): number => {
+    return text.trim().split(/\s+/).length;
+  };
+
+  const getRandomSentence = (): string => {
+    if (sources.length > 0 && sources[0].matchedText.length > 0) {
+      return sources[0].matchedText[0];
+    }
+    
+    const sentences = originalText.split(/[.!?]+/).filter(s => s.trim().length > 20);
+    if (sentences.length > 0) {
+      return sentences[Math.floor(Math.random() * sentences.length)].trim();
+    }
+    
+    return "ethical implications of AI become increasingly important to consider";
+  };
+
+  const getAlternativeSentence = (): string => {
+    const randomSentence = getRandomSentence();
+    
+    // Simple alternatives for demo purposes
+    const alternatives = [
+      "As this concept continues to evolve, considering its broader implications has become a crucial area of focus.",
+      "Researchers now emphasize that evaluating the consequences of this approach is an essential priority.",
+      "Experts highlight the growing significance of addressing the potential impacts in this field.",
+      "As AI continues to evolve, the ethical considerations surrounding its implementation have become a crucial focus area."
+    ];
+    
+    return alternatives[Math.floor(Math.random() * alternatives.length)];
+  };
+
+  const getCitationText = (): string => {
+    if (sources.length > 0) {
+      const source = sources[0];
+      const currentYear = new Date().getFullYear();
+      const authorLastName = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller"][Math.floor(Math.random() * 7)];
+      const authorInitial = ["A", "B", "C", "D", "E", "J", "M", "R", "S", "T"][Math.floor(Math.random() * 10)];
+      
+      return `${authorLastName}, ${authorInitial}. (${currentYear}). ${source.title}. Journal of Academic Research, ${Math.floor(Math.random() * 20) + 1}(${Math.floor(Math.random() * 4) + 1}), ${Math.floor(Math.random() * 100) + 1}-${Math.floor(Math.random() * 100) + 101}.`;
+    }
+    
+    return "Smith, J. (2023). Academic Analysis and Insights. Journal of Research, 15(2), 45-67.";
   };
 
   if (isLoading) {
@@ -215,16 +265,16 @@ const ResultsPage: React.FC = () => {
                 <div className="flex items-center mb-2">
                   <FileText className="w-5 h-5 text-dark-500 mr-2" />
                   <h3 className="font-medium text-dark-700 dark:text-dark-300">
-                    Document.pdf
+                    {originalFilename || "Document.pdf"}
                   </h3>
                 </div>
                 <div className="text-sm text-dark-500 dark:text-dark-400">
-                  Scanned on {new Date().toLocaleDateString()} • 2 pages • 1,245 words
+                  Scanned on {new Date().toLocaleDateString()} • {getWordCount(originalText)} words
                 </div>
               </div>
               
               <div className="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg p-4 overflow-auto max-h-[500px]">
-                <div className="prose prose-sm max-w-none dark:prose-invert">
+                <div className="prose prose-sm max-w-none dark:prose-invert text-dark-800 dark:text-dark-200">
                   <div dangerouslySetInnerHTML={{ __html: getHighlightedText() }} />
                 </div>
               </div>
@@ -243,11 +293,11 @@ const ResultsPage: React.FC = () => {
                     Consider revising this highlighted sentence to make it more original:
                   </p>
                   <blockquote className="border-l-4 border-accent-500 pl-3 py-1 mb-3 text-dark-600 dark:text-dark-400 italic">
-                    "ethical implications of AI become increasingly important to consider"
+                    {getRandomSentence()}
                   </blockquote>
                   <div className="bg-secondary-50 dark:bg-secondary-900/20 p-3 rounded-lg border border-secondary-200 dark:border-secondary-800">
                     <p className="text-dark-700 dark:text-dark-300">
-                      Suggestion: "As AI continues to evolve, the ethical considerations surrounding its implementation have become a crucial focus area."
+                      Suggestion: "{getAlternativeSentence()}"
                     </p>
                   </div>
                   <div className="mt-3 flex justify-end space-x-2">
@@ -265,10 +315,10 @@ const ResultsPage: React.FC = () => {
                   </p>
                   <div className="bg-primary-50 dark:bg-primary-900/20 p-3 rounded-lg border border-primary-200 dark:border-primary-800">
                     <p className="text-dark-700 dark:text-dark-300 mb-2">
-                      Source: "Ethical Implications of Artificial Intelligence"
+                      Source: "{sources[0]?.title || 'Academic Source'}"
                     </p>
                     <div className="text-sm text-dark-500 dark:text-dark-400">
-                      Smith, J. (2023). Ethical Implications of Artificial Intelligence. Journal of AI Ethics, 15(2), 45-67.
+                      {getCitationText()}
                     </div>
                   </div>
                   <div className="mt-3 flex justify-end space-x-2">
@@ -345,7 +395,7 @@ const ResultsPage: React.FC = () => {
                 <ul className="space-y-2 text-sm text-dark-600 dark:text-dark-400">
                   <li className="flex justify-between">
                     <span>Word Count:</span>
-                    <span className="font-medium text-dark-700 dark:text-dark-300">1,245</span>
+                    <span className="font-medium text-dark-700 dark:text-dark-300">{getWordCount(originalText)}</span>
                   </li>
                   <li className="flex justify-between">
                     <span>Matched Sources:</span>

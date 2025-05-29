@@ -44,9 +44,10 @@ const UploadPage: React.FC = () => {
   };
 
   const continueToResults = () => {
-    if (extractedText) {
+    if (extractedText && selectedFile) {
       // Store the extracted text in session storage for use in results page
       sessionStorage.setItem('extractedText', extractedText);
+      sessionStorage.setItem('originalFilename', selectedFile.name);
       
       // Navigate to results page
       navigate('/results');
