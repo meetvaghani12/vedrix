@@ -10,7 +10,8 @@ import {
   UserPlus,
   Check,
   X,
-  Clock
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 
 // User interface
@@ -23,118 +24,6 @@ interface User {
   created_at: string;
   last_login: string;
 }
-
-// Mock data for users
-const mockUsers: User[] = [
-  {
-    id: 1,
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    role: 'admin',
-    status: 'active',
-    created_at: '2023-08-15',
-    last_login: '2023-11-02 09:45:21'
-  },
-  {
-    id: 2,
-    name: 'Jane Smith',
-    email: 'jane.smith@example.com',
-    role: 'user',
-    status: 'active',
-    created_at: '2023-09-05',
-    last_login: '2023-11-01 14:30:00'
-  },
-  {
-    id: 3,
-    name: 'Mike Johnson',
-    email: 'mike.j@example.com',
-    role: 'user',
-    status: 'inactive',
-    created_at: '2023-07-22',
-    last_login: '2023-10-15 08:22:15'
-  },
-  {
-    id: 4,
-    name: 'Sarah Williams',
-    email: 'sarah.w@example.com',
-    role: 'editor',
-    status: 'active',
-    created_at: '2023-10-10',
-    last_login: '2023-11-02 11:05:37'
-  },
-  {
-    id: 5,
-    name: 'David Brown',
-    email: 'david.b@example.com',
-    role: 'user',
-    status: 'pending',
-    created_at: '2023-10-28',
-    last_login: 'Never'
-  },
-  {
-    id: 6,
-    name: 'Emma Wilson',
-    email: 'emma.w@example.com',
-    role: 'user',
-    status: 'active',
-    created_at: '2023-09-15',
-    last_login: '2023-10-29 16:40:22'
-  },
-  {
-    id: 7,
-    name: 'Alex Turner',
-    email: 'alex.t@example.com',
-    role: 'editor',
-    status: 'active',
-    created_at: '2023-08-05',
-    last_login: '2023-10-31 09:12:45'
-  },
-  {
-    id: 8,
-    name: 'Olivia Parker',
-    email: 'olivia.p@example.com',
-    role: 'user',
-    status: 'inactive',
-    created_at: '2023-07-10',
-    last_login: '2023-09-20 14:15:30'
-  },
-  {
-    id: 9,
-    name: 'James Lee',
-    email: 'james.l@example.com',
-    role: 'user',
-    status: 'active',
-    created_at: '2023-09-28',
-    last_login: '2023-11-01 10:35:12'
-  },
-  {
-    id: 10,
-    name: 'Sophia Martinez',
-    email: 'sophia.m@example.com',
-    role: 'admin',
-    status: 'active',
-    created_at: '2023-06-15',
-    last_login: '2023-11-02 08:05:17'
-  },
-  {
-    id: 11,
-    name: 'Ethan Clark',
-    email: 'ethan.c@example.com',
-    role: 'user',
-    status: 'pending',
-    created_at: '2023-10-30',
-    last_login: 'Never'
-  },
-  {
-    id: 12,
-    name: 'Isabella White',
-    email: 'isabella.w@example.com',
-    role: 'editor',
-    status: 'active',
-    created_at: '2023-08-22',
-    last_login: '2023-10-30 15:20:45'
-  }
-];
 
 // Modal component for adding/editing users
 interface UserModalProps {
@@ -379,140 +268,266 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
 
 // Main component
 const UserManagementPage: React.FC = () => {
-  // State for users data
-  const [users, setUsers] = useState<User[]>(mockUsers);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>(mockUsers);
-  
-  // State for search
+  const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // State for pagination
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [sortField, setSortField] = useState<keyof User>('created_at');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  
-  // State for sorting
-  const [sortField, setSortField] = useState<keyof User>('id');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  
-  // State for modals
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const usersPerPage = 10;
 
-  // Calculate pagination info
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-
-  // Handle search
+  // Fetch users from the API
+  const fetchUsers = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      queryParams.append('page', currentPage.toString());
+      queryParams.append('per_page', usersPerPage.toString());
+      queryParams.append('sort_by', sortField);
+      queryParams.append('sort_order', sortDirection);
+      
+      if (searchTerm) {
+        queryParams.append('search', searchTerm);
+      }
+      
+      if (statusFilter !== 'all') {
+        queryParams.append('status', statusFilter);
+      }
+      
+      if (roleFilter !== 'all') {
+        queryParams.append('role', roleFilter);
+      }
+      
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+      
+      // Make API request
+      const response = await fetch(`/api/admin/users/?${queryParams.toString()}`, {
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching users: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Update state with fetched data
+      setUsers(data.users);
+      setFilteredUsers(data.users);
+      setTotalUsers(data.total);
+      setTotalPages(data.total_pages);
+      
+    } catch (err) {
+      console.error('Failed to fetch users:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch users');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Fetch users whenever filters, sorting, or pagination changes
   useEffect(() => {
-    const filtered = users.filter((user) => {
-      return (
-        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.role.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    });
-    setFilteredUsers(filtered);
-    setCurrentPage(1); // Reset to first page after search
-  }, [searchTerm, users]);
+    fetchUsers();
+  }, [currentPage, sortField, sortDirection, searchTerm, statusFilter, roleFilter]);
 
-  // Handle sorting
   const handleSort = (field: keyof User) => {
-    const isAsc = sortField === field && sortDirection === 'asc';
-    setSortDirection(isAsc ? 'desc' : 'asc');
-    setSortField(field);
-
-    const sorted = [...filteredUsers].sort((a, b) => {
-      if (a[field] < b[field]) return isAsc ? 1 : -1;
-      if (a[field] > b[field]) return isAsc ? -1 : 1;
-      return 0;
-    });
-
-    setFilteredUsers(sorted);
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+    
+    // Reset to first page when sorting changes
+    setCurrentPage(1);
   };
 
-  // Handle page change
+  const handleFilter = () => {
+    // The filtering is now handled by the backend
+    // This function could be used for client-side filtering if needed
+  };
+
   const handlePageChange = (pageNumber: number) => {
     setCurrentPage(pageNumber);
   };
 
-  // Handle add/edit user
-  const handleAddEditUser = (user: User) => {
-    if (user.id && users.find(u => u.id === user.id)) {
-      // Edit existing user
-      setUsers(users.map(u => (u.id === user.id ? user : u)));
-    } else {
-      // Add new user
-      setUsers([...users, user]);
+  const handleAddEditUser = async (user: User) => {
+    setLoading(true);
+    
+    try {
+      // Get token
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+      
+      let response;
+      
+      if (user.id) {
+        // Update existing user
+        response = await fetch(`/api/admin/users/${user.id}/`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Token ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(user)
+        });
+      } else {
+        // Create new user
+        response = await fetch('/api/admin/users/', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Token ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(user)
+        });
+      }
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Error ${user.id ? 'updating' : 'creating'} user`);
+      }
+      
+      // Refresh the user list
+      fetchUsers();
+      
+    } catch (err) {
+      console.error('Failed to save user:', err);
+      alert(err instanceof Error ? err.message : 'Failed to save user');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Handle delete user
-  const handleDeleteUser = () => {
-    if (userToDelete) {
-      setUsers(users.filter(user => user.id !== userToDelete.id));
-      setUserToDelete(null);
+  const handleDeleteUser = async () => {
+    if (!deleteUserId) return;
+    
+    setLoading(true);
+    
+    try {
+      // Get token
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+      
+      // Delete user
+      const response = await fetch(`/api/admin/users/${deleteUserId}/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error deleting user');
+      }
+      
+      // Refresh user list
+      fetchUsers();
+      
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      alert(err instanceof Error ? err.message : 'Failed to delete user');
+    } finally {
+      setLoading(false);
+      setConfirmDialogOpen(false);
+      setDeleteUserId(null);
     }
   };
 
   return (
-    <div>
-      <div className="mb-6">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">User Management</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">Manage system users and their permissions</p>
+        <button 
+          onClick={() => {
+            setSelectedUser(null);
+            setModalOpen(true);
+          }}
+          className="px-4 py-2 bg-primary-600 text-white rounded-md flex items-center hover:bg-primary-700 transition-colors"
+        >
+          <UserPlus className="w-4 h-4 mr-2" />
+          Add User
+        </button>
       </div>
 
-      <div className="bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 mb-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 space-y-4 md:space-y-0">
-          {/* Search bar */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              className="block w-full md:w-64 pl-10 pr-3 py-2 border border-gray-300 dark:border-dark-600 rounded-md leading-5 bg-white dark:bg-dark-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-              placeholder="Search users..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-
-          {/* Add user button */}
-          <button
-            onClick={() => {
-              setCurrentUser(null);
-              setIsModalOpen(true);
-            }}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add User
-          </button>
+      {/* Error display */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg flex items-start">
+          <AlertCircle className="h-5 w-5 mr-2 mt-0.5" />
+          <span>{error}</span>
         </div>
+      )}
+      
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Search by name or email..."
+            className="pl-10 pr-4 py-2 w-full border border-gray-300 dark:border-dark-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-dark-800 text-gray-900 dark:text-white"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-3 py-2 bg-white dark:bg-dark-800 border border-gray-300 dark:border-dark-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 dark:text-white"
+        >
+          <option value="all">All Statuses</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="pending">Pending</option>
+        </select>
+        
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          className="px-3 py-2 bg-white dark:bg-dark-800 border border-gray-300 dark:border-dark-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 dark:text-white"
+        >
+          <option value="all">All Roles</option>
+          <option value="admin">Admin</option>
+          <option value="editor">Editor</option>
+          <option value="user">User</option>
+        </select>
+      </div>
 
-        {/* Users table */}
+      {/* Users Table */}
+      <div className="bg-white dark:bg-dark-800 rounded-xl shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-dark-700">
-            <thead className="bg-gray-50 dark:bg-dark-750">
+            <thead className="bg-gray-50 dark:bg-dark-700">
               <tr>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('id')}
-                >
-                  <div className="flex items-center">
-                    ID
-                    {sortField === 'id' && (
-                      sortDirection === 'asc' ? 
-                        <ChevronUp className="w-4 h-4 ml-1" /> : 
-                        <ChevronDown className="w-4 h-4 ml-1" />
-                    )}
-                  </div>
-                </th>
                 <th 
                   scope="col" 
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
@@ -522,8 +537,8 @@ const UserManagementPage: React.FC = () => {
                     Name
                     {sortField === 'name' && (
                       sortDirection === 'asc' ? 
-                        <ChevronUp className="w-4 h-4 ml-1" /> : 
-                        <ChevronDown className="w-4 h-4 ml-1" />
+                        <ChevronUp className="ml-1 h-4 w-4" /> : 
+                        <ChevronDown className="ml-1 h-4 w-4" />
                     )}
                   </div>
                 </th>
@@ -536,36 +551,48 @@ const UserManagementPage: React.FC = () => {
                     Email
                     {sortField === 'email' && (
                       sortDirection === 'asc' ? 
-                        <ChevronUp className="w-4 h-4 ml-1" /> : 
-                        <ChevronDown className="w-4 h-4 ml-1" />
+                        <ChevronUp className="ml-1 h-4 w-4" /> : 
+                        <ChevronDown className="ml-1 h-4 w-4" />
+                    )}
+                  </div>
+                </th>
+                <th 
+                  scope="col" 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
+                  Role
+                </th>
+                <th 
+                  scope="col" 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"
+                >
+                  Status
+                </th>
+                <th 
+                  scope="col" 
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
+                  onClick={() => handleSort('created_at')}
+                >
+                  <div className="flex items-center">
+                    Created
+                    {sortField === 'created_at' && (
+                      sortDirection === 'asc' ? 
+                        <ChevronUp className="ml-1 h-4 w-4" /> : 
+                        <ChevronDown className="ml-1 h-4 w-4" />
                     )}
                   </div>
                 </th>
                 <th 
                   scope="col" 
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('role')}
+                  onClick={() => handleSort('last_login')}
                 >
                   <div className="flex items-center">
-                    Role
-                    {sortField === 'role' && (
+                    Last Login
+                    {sortField === 'last_login' && (
                       sortDirection === 'asc' ? 
-                        <ChevronUp className="w-4 h-4 ml-1" /> : 
-                        <ChevronDown className="w-4 h-4 ml-1" />
-                    )}
-                  </div>
-                </th>
-                <th 
-                  scope="col" 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer"
-                  onClick={() => handleSort('status')}
-                >
-                  <div className="flex items-center">
-                    Status
-                    {sortField === 'status' && (
-                      sortDirection === 'asc' ? 
-                        <ChevronUp className="w-4 h-4 ml-1" /> : 
-                        <ChevronDown className="w-4 h-4 ml-1" />
+                        <ChevronUp className="ml-1 h-4 w-4" /> : 
+                        <ChevronDown className="ml-1 h-4 w-4" />
                     )}
                   </div>
                 </th>
@@ -575,116 +602,140 @@ const UserManagementPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-dark-800 divide-y divide-gray-200 dark:divide-dark-700">
-              {currentItems.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-dark-750">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {user.id}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {user.name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {user.email}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    <span className="capitalize">{user.role}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <StatusBadge status={user.status} />
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => {
-                        setCurrentUser(user);
-                        setIsModalOpen(true);
-                      }}
-                      className="text-primary-600 hover:text-primary-800 dark:text-primary-400 dark:hover:text-primary-300 mr-4"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setUserToDelete(user);
-                        setIsDeleteDialogOpen(true);
-                      }}
-                      className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </button>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-4 text-center">
+                    <div className="flex justify-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                    No users found
+                  </td>
+                </tr>
+              ) : (
+                users.map(user => (
+                  <tr key={user.id} className="hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500 dark:text-gray-400">{user.email}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          user.role === 'admin' 
+                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400' 
+                            : user.role === 'editor' 
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' 
+                              : 'bg-gray-100 text-gray-800 dark:bg-dark-700 dark:text-gray-300'
+                        }`}>
+                          {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <StatusBadge status={user.status} />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500 dark:text-gray-400">{user.created_at}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-500 dark:text-gray-400">{user.last_login}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end space-x-2">
+                        <button 
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setModalOpen(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setDeleteUserId(user.id);
+                            setConfirmDialogOpen(true);
+                          }}
+                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                        >
+                          <Trash className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Pagination */}
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center">
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
-              <span className="font-medium">
-                {indexOfLastItem > filteredUsers.length ? filteredUsers.length : indexOfLastItem}
-              </span>{" "}
-              of <span className="font-medium">{filteredUsers.length}</span> results
-            </span>
-          </div>
-
-          <div className="flex items-center space-x-2">
+      {/* Pagination */}
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-gray-700 dark:text-gray-300">
+          Showing <span className="font-medium">{users.length}</span> of <span className="font-medium">{totalUsers}</span> users
+        </div>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1 || loading}
+            className={`px-3 py-1 rounded-md ${
+              currentPage === 1 || loading
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-dark-700 dark:text-gray-500'
+                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 dark:bg-dark-800 dark:text-gray-300 dark:border-dark-600 dark:hover:bg-dark-700'
+            }`}
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          {[...Array(totalPages)].map((_, i) => (
             <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className={`p-2 rounded-md ${
-                currentPage === 1
-                  ? "text-gray-400 dark:text-gray-600 cursor-not-allowed"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700"
+              key={i + 1}
+              onClick={() => handlePageChange(i + 1)}
+              className={`px-3 py-1 rounded-md ${
+                currentPage === i + 1
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 dark:bg-dark-800 dark:text-gray-300 dark:border-dark-600 dark:hover:bg-dark-700'
               }`}
             >
-              <ChevronLeft className="h-5 w-5" />
+              {i + 1}
             </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((number) => (
-              <button
-                key={number}
-                onClick={() => handlePageChange(number)}
-                className={`px-3 py-1 rounded-md ${
-                  currentPage === number
-                    ? "bg-primary-600 text-white"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700"
-                }`}
-              >
-                {number}
-              </button>
-            ))}
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className={`p-2 rounded-md ${
-                currentPage === totalPages
-                  ? "text-gray-400 dark:text-gray-600 cursor-not-allowed"
-                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-700"
-              }`}
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </div>
+          ))}
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages || loading}
+            className={`px-3 py-1 rounded-md ${
+              currentPage === totalPages || loading
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-dark-700 dark:text-gray-500'
+                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 dark:bg-dark-800 dark:text-gray-300 dark:border-dark-600 dark:hover:bg-dark-700'
+            }`}
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
         </div>
       </div>
 
-      {/* User modal */}
-      <UserModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        user={currentUser}
-        onSave={handleAddEditUser}
+      {/* User modal for adding/editing */}
+      <UserModal 
+        isOpen={modalOpen} 
+        onClose={() => setModalOpen(false)} 
+        user={selectedUser} 
+        onSave={handleAddEditUser} 
       />
 
-      {/* Confirm delete dialog */}
-      <ConfirmDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
+      {/* Confirmation dialog for deletion */}
+      <ConfirmDialog 
+        isOpen={confirmDialogOpen}
+        onClose={() => setConfirmDialogOpen(false)}
         onConfirm={handleDeleteUser}
         title="Delete User"
-        message={`Are you sure you want to delete ${userToDelete?.name}? This action cannot be undone.`}
+        message="Are you sure you want to delete this user? This action cannot be undone."
       />
     </div>
   );

@@ -5,7 +5,11 @@ from .views import (
     UserDetailView, 
     LogoutView,
     VerifyOTPView,
-    ResendOTPView
+    ResendOTPView,
+    AdminAnalyticsView,
+    AdminLogsView,
+    AdminSettingsView,
+    UserManagementView
 )
 
 urlpatterns = [
@@ -15,4 +19,11 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
     path('verify-otp/', VerifyOTPView.as_view(), name='verify-otp'),
     path('resend-otp/', ResendOTPView.as_view(), name='resend-otp'),
+    
+    # Admin endpoints
+    path('admin/analytics/', AdminAnalyticsView.as_view(), name='admin-analytics'),
+    path('admin/logs/', AdminLogsView.as_view(), name='admin-logs'),
+    path('admin/settings/', AdminSettingsView.as_view(), name='admin-settings'),
+    path('admin/users/', UserManagementView.as_view(), name='admin-users'),
+    path('admin/users/<int:user_id>/', UserManagementView.as_view(), name='admin-user-detail'),
 ] 

@@ -2,120 +2,105 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, Clock, AlertTriangle, Info, CheckCircle, XCircle, Download, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-// Mock log data
-const mockLogs = [
-  {
-    id: '1',
-    timestamp: '2023-05-20T08:23:45Z',
-    level: 'info',
-    message: 'User john.doe@example.com logged in successfully',
-    source: 'auth-service',
-    details: { userId: 'usr_123', ip: '192.168.1.1', userAgent: 'Mozilla/5.0...' }
-  },
-  {
-    id: '2',
-    timestamp: '2023-05-20T08:24:12Z',
-    level: 'warning',
-    message: 'High CPU usage detected (85%)',
-    source: 'monitoring-service',
-    details: { server: 'server-01', duration: '5m', threshold: '80%' }
-  },
-  {
-    id: '3',
-    timestamp: '2023-05-20T08:25:30Z',
-    level: 'error',
-    message: 'Database connection failed',
-    source: 'db-service',
-    details: { database: 'users-db', error: 'Connection timeout', retries: 3 }
-  },
-  {
-    id: '4',
-    timestamp: '2023-05-20T08:30:45Z',
-    level: 'info',
-    message: 'Document scan completed for assignment.pdf',
-    source: 'scanning-service',
-    details: { documentId: 'doc_456', size: '2.3MB', pages: 12 }
-  },
-  {
-    id: '5',
-    timestamp: '2023-05-20T08:32:15Z',
-    level: 'error',
-    message: 'Payment processing failed',
-    source: 'payment-service',
-    details: { transactionId: 'tx_789', userId: 'usr_456', amount: '$49.99', error: 'Card declined' }
-  },
-  {
-    id: '6',
-    timestamp: '2023-05-20T08:35:22Z',
-    level: 'info',
-    message: 'System backup completed successfully',
-    source: 'backup-service',
-    details: { backupId: 'bkp_123', size: '1.2GB', duration: '3m 45s' }
-  },
-  {
-    id: '7',
-    timestamp: '2023-05-20T08:40:18Z',
-    level: 'warning',
-    message: 'API rate limit approaching for client',
-    source: 'api-gateway',
-    details: { clientId: 'client_789', currentUsage: '950/1000', resetIn: '20m' }
-  },
-  {
-    id: '8',
-    timestamp: '2023-05-20T08:45:30Z',
-    level: 'info',
-    message: 'New user registered: jane.smith@example.com',
-    source: 'user-service',
-    details: { userId: 'usr_789', plan: 'Premium', referredBy: 'usr_123' }
-  },
-  {
-    id: '9',
-    timestamp: '2023-05-20T08:50:12Z',
-    level: 'error',
-    message: 'Email delivery failed',
-    source: 'notification-service',
-    details: { recipientId: 'usr_321', emailId: 'em_456', reason: 'Invalid email address' }
-  },
-  {
-    id: '10',
-    timestamp: '2023-05-20T08:55:45Z',
-    level: 'info',
-    message: 'Scheduled maintenance completed',
-    source: 'system-service',
-    details: { maintenanceId: 'mt_123', duration: '10m', services: ['api', 'db', 'auth'] }
-  }
-];
+interface LogDetail {
+  [key: string]: any;
+}
+
+interface Log {
+  id: string;
+  timestamp: string;
+  level: string;
+  message: string;
+  source: string;
+  details: LogDetail;
+}
+
+interface LogsResponse {
+  logs: Log[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
 
 const AdminLogsPage: React.FC = () => {
-  const [logs, setLogs] = useState(mockLogs);
+  const [logs, setLogs] = useState<Log[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLogLevels, setSelectedLogLevels] = useState<string[]>(['info', 'warning', 'error']);
   const [selectedTimeRange, setSelectedTimeRange] = useState<string>('today');
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalLogs, setTotalLogs] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    // Simulate data loading
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
-  const filteredLogs = logs.filter(log => {
-    // Filter by log level
-    if (!selectedLogLevels.includes(log.level)) return false;
-    
-    // Filter by search query (case insensitive)
-    if (searchQuery && !log.message.toLowerCase().includes(searchQuery.toLowerCase()) && 
-        !log.source.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
+  const fetchLogs = async (refresh = false) => {
+    if (refresh) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
     }
     
-    return true;
-  });
+    setError(null);
+    
+    try {
+      // Get auth token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+      
+      // Build query params
+      const queryParams = new URLSearchParams();
+      selectedLogLevels.forEach(level => queryParams.append('levels', level));
+      if (searchQuery) queryParams.append('search', searchQuery);
+      queryParams.append('timeRange', selectedTimeRange);
+      queryParams.append('page', page.toString());
+      
+      const response = await fetch(`/api/admin/logs/?${queryParams.toString()}`, {
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching logs: ${response.statusText}`);
+      }
+      
+      const data: LogsResponse = await response.json();
+      setLogs(data.logs);
+      setTotalLogs(data.total);
+      setTotalPages(data.totalPages);
+    } catch (err) {
+      console.error('Failed to fetch logs:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch logs');
+    } finally {
+      setLoading(false);
+      if (refresh) {
+        setIsRefreshing(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs();
+  }, [selectedLogLevels, selectedTimeRange, page]);
+  
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (page !== 1) {
+        setPage(1); // Reset to page 1 when search changes
+      } else {
+        fetchLogs(); // If already on page 1, just fetch
+      }
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const handleLogLevelToggle = (level: string) => {
     setSelectedLogLevels(prev => 
@@ -126,11 +111,7 @@ const AdminLogsPage: React.FC = () => {
   };
 
   const refreshLogs = () => {
-    setIsRefreshing(true);
-    // Simulate refreshing data
-    setTimeout(() => {
-      setIsRefreshing(false);
-    }, 1000);
+    fetchLogs(true);
   };
 
   const getLogLevelIcon = (level: string) => {
@@ -149,6 +130,32 @@ const AdminLogsPage: React.FC = () => {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString();
+  };
+  
+  const handlePreviousPage = () => {
+    if (page > 1) {
+      setPage(page - 1);
+    }
+  };
+  
+  const handleNextPage = () => {
+    if (page < totalPages) {
+      setPage(page + 1);
+    }
+  };
+  
+  const exportLogs = () => {
+    // In a real application, this would generate and download a file
+    // For this example, we'll just show the current logs in JSON format
+    const dataStr = JSON.stringify(logs, null, 2);
+    const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
+    
+    const exportFileDefaultName = `logs-export-${new Date().toISOString().slice(0, 10)}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
   };
 
   return (
@@ -179,6 +186,7 @@ const AdminLogsPage: React.FC = () => {
           </button>
           
           <button
+            onClick={exportLogs}
             className="flex items-center px-4 py-2 rounded-lg border border-gray-300 dark:border-dark-700 bg-white dark:bg-dark-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors"
           >
             <Download className="h-4 w-4 mr-2" />
@@ -186,6 +194,14 @@ const AdminLogsPage: React.FC = () => {
           </button>
         </div>
       </div>
+      
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative dark:bg-red-900/20 dark:text-red-400 dark:border-red-800">
+          <strong className="font-bold">Error:</strong>
+          <span className="block sm:inline"> {error}</span>
+        </div>
+      )}
       
       {/* Filters */}
       <div className="bg-white dark:bg-dark-800 rounded-xl shadow-sm p-4">
@@ -276,14 +292,14 @@ const AdminLogsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-dark-800 divide-y divide-gray-200 dark:divide-dark-700">
-                {filteredLogs.length === 0 ? (
+                {logs.length === 0 ? (
                   <tr className="bg-white dark:bg-dark-800">
                     <td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
                       No logs found matching your filters.
                     </td>
                   </tr>
                 ) : (
-                  filteredLogs.map((log) => (
+                  logs.map((log) => (
                     <React.Fragment key={log.id}>
                       <tr 
                         className="hover:bg-gray-50 dark:hover:bg-dark-700 cursor-pointer transition-colors"
@@ -338,13 +354,29 @@ const AdminLogsPage: React.FC = () => {
       {/* Pagination */}
       <div className="flex justify-between items-center">
         <div className="text-sm text-gray-700 dark:text-gray-300">
-          Showing <span className="font-medium">{filteredLogs.length}</span> of <span className="font-medium">{mockLogs.length}</span> logs
+          Showing <span className="font-medium">{logs.length}</span> of <span className="font-medium">{totalLogs}</span> logs
         </div>
         <div className="flex space-x-2">
-          <button className="px-3 py-1 border border-gray-300 dark:border-dark-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-dark-800 hover:bg-gray-50 dark:hover:bg-dark-700">
+          <button 
+            onClick={handlePreviousPage}
+            disabled={page === 1 || loading}
+            className={`px-3 py-1 border border-gray-300 dark:border-dark-700 rounded-md text-sm font-medium ${
+              page === 1 || loading
+                ? 'bg-gray-100 text-gray-400 dark:bg-dark-800 dark:text-gray-600 cursor-not-allowed'
+                : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-dark-800 hover:bg-gray-50 dark:hover:bg-dark-700'
+            }`}
+          >
             Previous
           </button>
-          <button className="px-3 py-1 border border-gray-300 dark:border-dark-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-dark-800 hover:bg-gray-50 dark:hover:bg-dark-700">
+          <button 
+            onClick={handleNextPage}
+            disabled={page >= totalPages || loading}
+            className={`px-3 py-1 border border-gray-300 dark:border-dark-700 rounded-md text-sm font-medium ${
+              page >= totalPages || loading
+                ? 'bg-gray-100 text-gray-400 dark:bg-dark-800 dark:text-gray-600 cursor-not-allowed'
+                : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-dark-800 hover:bg-gray-50 dark:hover:bg-dark-700'
+            }`}
+          >
             Next
           </button>
         </div>

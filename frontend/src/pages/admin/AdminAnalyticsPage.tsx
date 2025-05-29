@@ -2,80 +2,130 @@ import React, { useState, useEffect } from 'react';
 import { BarChart, LineChart, PieChart, ArrowUp, ArrowDown, Users, FileText, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 
-// Mock data for the charts
-const mockUserData = [
-  { month: 'Jan', users: 65 },
-  { month: 'Feb', users: 78 },
-  { month: 'Mar', users: 90 },
-  { month: 'Apr', users: 81 },
-  { month: 'May', users: 95 },
-  { month: 'Jun', users: 110 },
-];
+interface UserGrowthData {
+  date: string;
+  users: number;
+}
 
-const mockDocumentChecks = [
-  { month: 'Jan', checks: 250 },
-  { month: 'Feb', checks: 285 },
-  { month: 'Mar', checks: 310 },
-  { month: 'Apr', checks: 350 },
-  { month: 'May', checks: 410 },
-  { month: 'Jun', checks: 450 },
-];
+interface DocumentCheckData {
+  date: string;
+  checks: number;
+}
 
-const mockPlagiarismRate = [
-  { category: 'Original', value: 72 },
-  { category: 'Minor similarities', value: 18 },
-  { category: 'Significant similarities', value: 7 },
-  { category: 'Plagiarized', value: 3 },
-];
+interface PlagiarismData {
+  category: string;
+  value: number;
+}
+
+interface StatsData {
+  users: {
+    total: number;
+    change: string;
+    isPositive: boolean;
+  };
+  documents: {
+    total: number;
+    change: string;
+    isPositive: boolean;
+  };
+  responseTime: {
+    value: string;
+    change: string;
+    isPositive: boolean;
+  };
+  plagiarismRate: {
+    value: string;
+    change: string;
+    isPositive: boolean;
+  };
+}
+
+interface AnalyticsData {
+  stats: StatsData;
+  charts: {
+    userGrowth: UserGrowthData[];
+    documentChecks: DocumentCheckData[];
+    plagiarismDistribution: PlagiarismData[];
+  };
+}
 
 const AdminAnalyticsPage: React.FC = () => {
   const [selectedTimeRange, setSelectedTimeRange] = useState<'week' | 'month' | 'year'>('month');
   const [loading, setLoading] = useState(true);
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Simulate data loading
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    const fetchAnalyticsData = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        // Get auth token from localStorage
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('Authentication token not found');
+        }
+        
+        const response = await fetch(`/api/admin/analytics/?timeRange=${selectedTimeRange}`, {
+          headers: {
+            'Authorization': `Token ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Error fetching analytics: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        setAnalyticsData(data);
+      } catch (err) {
+        console.error('Failed to fetch analytics data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch analytics data');
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    return () => clearTimeout(timer);
-  }, []);
+    fetchAnalyticsData();
+  }, [selectedTimeRange]);
 
   // Stats cards data
-  const statsCards = [
+  const statsCards = analyticsData ? [
     {
       title: 'Total Users',
-      value: '2,845',
-      change: '+12.5%',
-      isPositive: true,
+      value: analyticsData.stats.users.total.toLocaleString(),
+      change: analyticsData.stats.users.change,
+      isPositive: analyticsData.stats.users.isPositive,
       icon: <Users className="h-6 w-6 text-blue-500" />,
       color: 'bg-blue-100 dark:bg-blue-900/20',
     },
     {
       title: 'Documents Checked',
-      value: '18,392',
-      change: '+8.3%',
-      isPositive: true,
+      value: analyticsData.stats.documents.total.toLocaleString(),
+      change: analyticsData.stats.documents.change,
+      isPositive: analyticsData.stats.documents.isPositive,
       icon: <FileText className="h-6 w-6 text-purple-500" />,
       color: 'bg-purple-100 dark:bg-purple-900/20',
     },
     {
       title: 'Avg. Response Time',
-      value: '2.3s',
-      change: '-0.5s',
-      isPositive: true,
+      value: analyticsData.stats.responseTime.value,
+      change: analyticsData.stats.responseTime.change,
+      isPositive: analyticsData.stats.responseTime.isPositive,
       icon: <Clock className="h-6 w-6 text-green-500" />,
       color: 'bg-green-100 dark:bg-green-900/20',
     },
     {
       title: 'Plagiarism Rate',
-      value: '3.2%',
-      change: '-0.8%',
-      isPositive: true,
+      value: analyticsData.stats.plagiarismRate.value,
+      change: analyticsData.stats.plagiarismRate.change,
+      isPositive: analyticsData.stats.plagiarismRate.isPositive,
       icon: <PieChart className="h-6 w-6 text-red-500" />,
       color: 'bg-red-100 dark:bg-red-900/20',
     },
-  ];
+  ] : [];
 
   return (
     <div className="space-y-6">
@@ -116,36 +166,60 @@ const AdminAnalyticsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative dark:bg-red-900/20 dark:text-red-400 dark:border-red-800">
+          <strong className="font-bold">Error:</strong>
+          <span className="block sm:inline"> {error}</span>
+        </div>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statsCards.map((stat, index) => (
-          <motion.div
-            key={stat.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: index * 0.1 }}
-            className="bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{stat.title}</p>
-                <h3 className="text-2xl font-bold mt-1 text-gray-900 dark:text-white">{stat.value}</h3>
-                <div className="flex items-center mt-2">
-                  {stat.isPositive ? (
-                    <ArrowUp className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <ArrowDown className="h-4 w-4 text-red-500" />
-                  )}
-                  <span className={`text-sm ml-1 ${stat.isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                    {stat.change}
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">vs last period</span>
+        {loading ? (
+          // Skeleton loaders for stats cards
+          Array(4).fill(0).map((_, index) => (
+            <div key={index} className="bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6 animate-pulse">
+              <div className="flex justify-between items-start">
+                <div className="w-2/3">
+                  <div className="h-3 bg-gray-200 dark:bg-dark-700 rounded w-1/2 mb-2"></div>
+                  <div className="h-6 bg-gray-200 dark:bg-dark-700 rounded w-full mb-2"></div>
+                  <div className="h-3 bg-gray-200 dark:bg-dark-700 rounded w-1/3"></div>
                 </div>
+                <div className="p-3 rounded-lg bg-gray-200 dark:bg-dark-700 h-12 w-12"></div>
               </div>
-              <div className={`p-3 rounded-lg ${stat.color}`}>{stat.icon}</div>
             </div>
-          </motion.div>
-        ))}
+          ))
+        ) : (
+          statsCards.map((stat, index) => (
+            <motion.div
+              key={stat.title}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: index * 0.1 }}
+              className="bg-white dark:bg-dark-800 rounded-xl shadow-sm p-6"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{stat.title}</p>
+                  <h3 className="text-2xl font-bold mt-1 text-gray-900 dark:text-white">{stat.value}</h3>
+                  <div className="flex items-center mt-2">
+                    {stat.isPositive ? (
+                      <ArrowUp className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <ArrowDown className="h-4 w-4 text-red-500" />
+                    )}
+                    <span className={`text-sm ml-1 ${stat.isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                      {stat.change}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">vs last period</span>
+                  </div>
+                </div>
+                <div className={`p-3 rounded-lg ${stat.color}`}>{stat.icon}</div>
+              </div>
+            </motion.div>
+          ))
+        )}
       </div>
 
       {/* Charts */}
@@ -163,27 +237,37 @@ const AdminAnalyticsPage: React.FC = () => {
             <div className="h-64 flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
             </div>
-          ) : (
+          ) : analyticsData ? (
             <div className="h-64 relative">
-              {/* This is a placeholder for the chart. In a real application, you would use a charting library */}
+              {/* Chart visualization of userGrowth data */}
               <div className="absolute inset-0 flex flex-col justify-end">
                 <div className="flex items-end justify-between h-52">
-                  {mockUserData.map((item, index) => (
-                    <div key={index} className="flex flex-col items-center w-full">
-                      <div 
-                        className="w-12 bg-blue-500 rounded-t-md" 
-                        style={{ 
-                          height: `${(item.users / Math.max(...mockUserData.map(d => d.users))) * 100}%`,
-                          maxHeight: '100%' 
-                        }}
-                      ></div>
-                      <span className="text-xs mt-2 text-gray-600 dark:text-gray-400">{item.month}</span>
-                    </div>
-                  ))}
+                  {analyticsData.charts.userGrowth.map((item, index) => {
+                    const maxUsers = Math.max(...analyticsData.charts.userGrowth.map(d => d.users));
+                    const height = maxUsers > 0 ? (item.users / maxUsers) * 100 : 0;
+                    
+                    return (
+                      <div key={index} className="flex flex-col items-center w-full">
+                        <div 
+                          className="w-12 bg-blue-500 rounded-t-md" 
+                          style={{ 
+                            height: `${height}%`,
+                            maxHeight: '100%',
+                            minHeight: item.users > 0 ? '4px' : '0'
+                          }}
+                        ></div>
+                        <span className="text-xs mt-2 text-gray-600 dark:text-gray-400">
+                          {selectedTimeRange === 'year' 
+                            ? item.date.substring(5) // Show only month for year view
+                            : item.date.substring(5).replace('-', '/')} {/* Format date for display */}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Document Checks Chart */}
@@ -199,28 +283,35 @@ const AdminAnalyticsPage: React.FC = () => {
             <div className="h-64 flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
             </div>
-          ) : (
+          ) : analyticsData ? (
             <div className="h-64 relative">
-              {/* This is a placeholder for the chart. In a real application, you would use a charting library */}
+              {/* Line chart for document checks */}
               <div className="absolute inset-0 flex items-end">
                 <svg className="w-full h-52" viewBox="0 0 300 100" preserveAspectRatio="none">
-                  <path
-                    d={`M0,${100 - (mockDocumentChecks[0].checks / 450) * 100} ${mockDocumentChecks.map((d, i) => 
-                      `L${(i * 300) / (mockDocumentChecks.length - 1)},${100 - (d.checks / 450) * 100}`
-                    ).join(' ')}`}
-                    stroke="rgb(168, 85, 247)"
-                    strokeWidth="2"
-                    fill="none"
-                  />
+                  {analyticsData.charts.documentChecks.length > 0 && (
+                    <path
+                      d={`M0,${100 - (analyticsData.charts.documentChecks[0].checks / Math.max(...analyticsData.charts.documentChecks.map(d => d.checks))) * 100} ${
+                        analyticsData.charts.documentChecks.map((d, i) => 
+                          `L${(i * 300) / (analyticsData.charts.documentChecks.length - 1)},${
+                            100 - (d.checks / Math.max(...analyticsData.charts.documentChecks.map(c => c.checks))) * 100
+                          }`
+                        ).join(' ')}`}
+                      stroke="rgb(168, 85, 247)"
+                      strokeWidth="2"
+                      fill="none"
+                    />
+                  )}
                 </svg>
               </div>
               <div className="absolute bottom-0 w-full flex justify-between px-2">
-                {mockDocumentChecks.map((item, i) => (
-                  <div key={i} className="text-xs text-gray-600 dark:text-gray-400">{item.month}</div>
+                {analyticsData.charts.documentChecks.map((item, i) => (
+                  <div key={i} className="text-xs text-gray-600 dark:text-gray-400">
+                    {item.date.substring(5)}
+                  </div>
                 ))}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
 
         {/* Plagiarism Rate Chart */}
@@ -236,50 +327,59 @@ const AdminAnalyticsPage: React.FC = () => {
             <div className="h-64 flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
             </div>
-          ) : (
+          ) : analyticsData ? (
             <div className="h-64 flex">
-              {/* This is a placeholder for a pie chart */}
+              {/* Pie chart for plagiarism distribution */}
               <div className="w-1/2 flex items-center justify-center">
                 <div className="relative h-48 w-48">
                   <svg viewBox="0 0 100 100" className="h-full w-full">
-                    {/* Pie chart segments */}
-                    <circle 
-                      cx="50" cy="50" r="40" 
-                      fill="transparent" 
-                      stroke="#4ade80" 
-                      strokeWidth="20" 
-                      strokeDasharray={`${mockPlagiarismRate[0].value * 2.51} ${251 - mockPlagiarismRate[0].value * 2.51}`} 
-                      strokeDashoffset="0" 
-                    />
-                    <circle 
-                      cx="50" cy="50" r="40" 
-                      fill="transparent" 
-                      stroke="#fbbf24" 
-                      strokeWidth="20" 
-                      strokeDasharray={`${mockPlagiarismRate[1].value * 2.51} ${251 - mockPlagiarismRate[1].value * 2.51}`} 
-                      strokeDashoffset={`${-mockPlagiarismRate[0].value * 2.51}`} 
-                    />
-                    <circle 
-                      cx="50" cy="50" r="40" 
-                      fill="transparent" 
-                      stroke="#fb923c" 
-                      strokeWidth="20" 
-                      strokeDasharray={`${mockPlagiarismRate[2].value * 2.51} ${251 - mockPlagiarismRate[2].value * 2.51}`} 
-                      strokeDashoffset={`${-(mockPlagiarismRate[0].value + mockPlagiarismRate[1].value) * 2.51}`} 
-                    />
-                    <circle 
-                      cx="50" cy="50" r="40" 
-                      fill="transparent" 
-                      stroke="#ef4444" 
-                      strokeWidth="20" 
-                      strokeDasharray={`${mockPlagiarismRate[3].value * 2.51} ${251 - mockPlagiarismRate[3].value * 2.51}`} 
-                      strokeDashoffset={`${-(mockPlagiarismRate[0].value + mockPlagiarismRate[1].value + mockPlagiarismRate[2].value) * 2.51}`} 
-                    />
+                    {/* Calculate total for percentages */}
+                    {(() => {
+                      const total = analyticsData.charts.plagiarismDistribution.reduce((sum, item) => sum + item.value, 0);
+                      const normalizedData = analyticsData.charts.plagiarismDistribution.map(item => ({
+                        ...item,
+                        normalizedValue: (item.value / total) * 360 // Convert to degrees
+                      }));
+                      
+                      let currentAngle = 0;
+                      
+                      return normalizedData.map((item, index) => {
+                        const startAngle = currentAngle;
+                        const endAngle = currentAngle + item.normalizedValue;
+                        
+                        // SVG circle parameters
+                        const radius = 40;
+                        const strokeWidth = 20;
+                        const circumference = 2 * Math.PI * radius;
+                        
+                        // Calculate stroke-dasharray and stroke-dashoffset
+                        const dashArray = `${(item.normalizedValue / 360) * circumference} ${circumference}`;
+                        const dashOffset = -((startAngle / 360) * circumference);
+                        
+                        // Color based on category
+                        const colors = ['#4ade80', '#fbbf24', '#fb923c', '#ef4444'];
+                        
+                        currentAngle = endAngle;
+                        
+                        return (
+                          <circle 
+                            key={index}
+                            cx="50" cy="50" r={radius}
+                            fill="transparent" 
+                            stroke={colors[index % colors.length]}
+                            strokeWidth={strokeWidth}
+                            strokeDasharray={dashArray}
+                            strokeDashoffset={dashOffset}
+                            transform="rotate(-90 50 50)"
+                          />
+                        );
+                      });
+                    })()}
                   </svg>
                 </div>
               </div>
               <div className="w-1/2 flex flex-col justify-center">
-                {mockPlagiarismRate.map((item, i) => (
+                {analyticsData.charts.plagiarismDistribution.map((item, i) => (
                   <div key={i} className="flex items-center mb-3">
                     <div className={`h-4 w-4 rounded-full mr-2 ${
                       i === 0 ? 'bg-green-400' : 
@@ -294,7 +394,7 @@ const AdminAnalyticsPage: React.FC = () => {
                 ))}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     
     # Local apps
     'authentication',
+    'document_processor',
 ]
 
 MIDDLEWARE = [
@@ -64,6 +65,25 @@ MIDDLEWARE = [
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True  # In production, specify frontend URL
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 ROOT_URLCONF = 'turnitin_backend.urls'
 
@@ -131,6 +151,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Media files (Uploaded files)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

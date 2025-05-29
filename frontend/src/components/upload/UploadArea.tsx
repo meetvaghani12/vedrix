@@ -1,20 +1,95 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, File, X, FileText, Check } from 'lucide-react';
+import { Upload, X, FileText, Check, AlertCircle } from 'lucide-react';
 import Button from '../ui/Button';
 
 interface UploadAreaProps {
   onFileSelected: (file: File) => void;
+  onTextExtracted?: (text: string) => void;
 }
 
-const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected }) => {
+const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [extractedText, setExtractedText] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelected = (file: File) => {
+  const handleFileSelected = async (file: File) => {
+    // Reset states
+    setUploadError(null);
+    setExtractedText(null);
     setSelectedFile(file);
     onFileSelected(file);
+    
+    // Check file type
+    const fileName = file.name.toLowerCase();
+    if (!fileName.endsWith('.pdf') && !fileName.endsWith('.docx') && !fileName.endsWith('.doc')) {
+      setUploadError('Unsupported file type. Please upload a PDF, DOC, or DOCX file.');
+      return;
+    }
+    
+    // Check file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('File is too large. Maximum size is 10MB.');
+      return;
+    }
+    
+    // Upload file to server
+    await uploadFile(file);
+  };
+
+  const uploadFile = async (file: File) => {
+    setIsUploading(true);
+    
+    try {
+      const formData = new FormData();
+      formData.append('title', file.name);
+      formData.append('file', file);
+      
+      const response = await fetch('http://localhost:8000/api/documents/', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+        headers: {
+          // Don't set Content-Type header when using FormData
+          // browser will automatically set the correct boundary
+          'Accept': 'application/json',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Upload failed with status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Get the extracted text
+      const textResponse = await fetch(`http://localhost:8000/api/documents/${data.id}/extracted_text/`, {
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      if (!textResponse.ok) {
+        throw new Error(`Failed to get extracted text with status: ${textResponse.status}`);
+      }
+      
+      const textData = await textResponse.json();
+      setExtractedText(textData.extracted_text);
+      
+      if (onTextExtracted) {
+        onTextExtracted(textData.extracted_text);
+      }
+      
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setUploadError('Failed to upload file. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
@@ -58,6 +133,8 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected }) => {
 
   const removeSelectedFile = () => {
     setSelectedFile(null);
+    setExtractedText(null);
+    setUploadError(null);
   };
 
   return (
@@ -65,7 +142,7 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected }) => {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt,.doc,.docx,.pdf,.rtf"
+        accept=".doc,.docx,.pdf"
         onChange={handleFileInputChange}
         className="hidden"
       />
@@ -107,7 +184,7 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected }) => {
               Browse Files
             </Button>
             <p className="mt-4 text-sm text-dark-500 dark:text-dark-400">
-              Supported formats: .docx, .pdf, .txt, .rtf (max 10MB)
+              Supported formats: .docx, .pdf, .doc (max 10MB)
             </p>
           </div>
         ) : (
@@ -132,17 +209,51 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected }) => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="mt-6 flex items-center justify-center">
-              <motion.div 
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.2 }}
-                className="w-8 h-8 rounded-full bg-secondary-500 flex items-center justify-center mr-2"
-              >
-                <Check className="w-5 h-5 text-white" />
-              </motion.div>
-              <p className="text-secondary-500 font-medium">File ready for scanning</p>
-            </div>
+            
+            {isUploading && (
+              <div className="mt-6">
+                <div className="w-full bg-gray-200 dark:bg-dark-700 rounded-full h-2">
+                  <div className="h-full rounded-full bg-primary-500 animate-pulse" style={{ width: '100%' }}></div>
+                </div>
+                <p className="mt-2 text-sm text-dark-500 dark:text-dark-400">
+                  Uploading and extracting text...
+                </p>
+              </div>
+            )}
+            
+            {uploadError && (
+              <div className="mt-6 text-center">
+                <div className="flex items-center justify-center text-red-500">
+                  <AlertCircle className="w-5 h-5 mr-2" />
+                  <p>{uploadError}</p>
+                </div>
+              </div>
+            )}
+            
+            {!isUploading && !uploadError && (
+              <div className="mt-6 flex items-center justify-center">
+                <motion.div 
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.2 }}
+                  className="w-8 h-8 rounded-full bg-secondary-500 flex items-center justify-center mr-2"
+                >
+                  <Check className="w-5 h-5 text-white" />
+                </motion.div>
+                <p className="text-secondary-500 font-medium">
+                  {extractedText ? 'Text extracted successfully' : 'File ready for processing'}
+                </p>
+              </div>
+            )}
+            
+            {extractedText && (
+              <div className="mt-6 p-4 bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg text-left max-h-60 overflow-y-auto">
+                <h4 className="font-medium text-dark-800 dark:text-dark-200 mb-2">Extracted Text Preview:</h4>
+                <p className="text-dark-600 dark:text-dark-400 text-sm whitespace-pre-line">
+                  {extractedText.length > 300 ? `${extractedText.substring(0, 300)}...` : extractedText}
+                </p>
+              </div>
+            )}
           </div>
         )}
       </motion.div>

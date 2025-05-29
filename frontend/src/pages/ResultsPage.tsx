@@ -19,53 +19,123 @@ const ResultsPage: React.FC = () => {
   const [selectedSource, setSelectedSource] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Simulated data loading
+  // Load data from session storage or use simulated data
   useEffect(() => {
     const timer = setTimeout(() => {
-      const sampleText = `The concept of artificial intelligence has been a subject of fascination for decades. As technology advances, the ethical implications of AI become increasingly important to consider. Researchers argue that responsible development of AI systems must include considerations of fairness, transparency, and accountability. The potential for AI to transform industries is significant, but challenges remain in ensuring these systems operate in ways that benefit society as a whole.`;
+      // Try to get extracted text from session storage
+      const extractedText = sessionStorage.getItem('extractedText');
       
-      setOriginalText(sampleText);
+      // If we have extracted text from the upload, use it
+      if (extractedText) {
+        setOriginalText(extractedText);
+        
+        // Generate mock sources based on the extracted text
+        const mockSources = generateMockSources(extractedText);
+        setSources(mockSources);
+        
+        // Calculate a mock score (this would be replaced with real analysis)
+        setOverallScore(Math.floor(Math.random() * 20) + 75); // Random score between 75-95%
+      } else {
+        // Fallback to sample text if no extracted text is available
+        const sampleText = `The concept of artificial intelligence has been a subject of fascination for decades. As technology advances, the ethical implications of AI become increasingly important to consider. Researchers argue that responsible development of AI systems must include considerations of fairness, transparency, and accountability. The potential for AI to transform industries is significant, but challenges remain in ensuring these systems operate in ways that benefit society as a whole.`;
+        
+        setOriginalText(sampleText);
+        
+        const mockSources: Source[] = [
+          {
+            id: 1,
+            title: "Ethical Implications of Artificial Intelligence",
+            url: "https://journal.ai/ethical-implications",
+            matchPercentage: 23,
+            matchedText: [
+              "ethical implications of AI become increasingly important to consider",
+              "responsible development of AI systems must include considerations of fairness, transparency, and accountability"
+            ]
+          },
+          {
+            id: 2,
+            title: "The Future of AI Technology",
+            url: "https://techreview.org/ai-future",
+            matchPercentage: 17,
+            matchedText: [
+              "The concept of artificial intelligence has been a subject of fascination for decades",
+              "The potential for AI to transform industries is significant"
+            ]
+          },
+          {
+            id: 3,
+            title: "AI and Society: Challenges and Opportunities",
+            url: "https://airesearch.edu/society-challenges",
+            matchPercentage: 8,
+            matchedText: [
+              "challenges remain in ensuring these systems operate in ways that benefit society as a whole"
+            ]
+          },
+        ];
+        
+        setSources(mockSources);
+        setOverallScore(85); // 85% original, 15% plagiarized
+      }
       
-      const mockSources: Source[] = [
-        {
-          id: 1,
-          title: "Ethical Implications of Artificial Intelligence",
-          url: "https://journal.ai/ethical-implications",
-          matchPercentage: 23,
-          matchedText: [
-            "ethical implications of AI become increasingly important to consider",
-            "responsible development of AI systems must include considerations of fairness, transparency, and accountability"
-          ]
-        },
-        {
-          id: 2,
-          title: "The Future of AI Technology",
-          url: "https://techreview.org/ai-future",
-          matchPercentage: 17,
-          matchedText: [
-            "The concept of artificial intelligence has been a subject of fascination for decades",
-            "The potential for AI to transform industries is significant"
-          ]
-        },
-        {
-          id: 3,
-          title: "AI and Society: Challenges and Opportunities",
-          url: "https://airesearch.edu/society-challenges",
-          matchPercentage: 8,
-          matchedText: [
-            "challenges remain in ensuring these systems operate in ways that benefit society as a whole"
-          ]
-        },
-      ];
-      
-      setSources(mockSources);
-      setOverallScore(85); // 85% original, 15% plagiarized
       setSelectedSource(1);
       setIsLoading(false);
     }, 1000);
     
     return () => clearTimeout(timer);
   }, []);
+
+  // Helper function to generate mock sources based on extracted text
+  const generateMockSources = (text: string): Source[] => {
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20);
+    
+    if (sentences.length < 3) {
+      return [
+        {
+          id: 1,
+          title: "Academic Source",
+          url: "https://example.com/academic-source",
+          matchPercentage: 5,
+          matchedText: [sentences[0] || "Sample matched text"]
+        }
+      ];
+    }
+    
+    // Take 3 random sentences to use as "matched" text
+    const randomSentences = [];
+    const usedIndexes = new Set<number>();
+    
+    while (randomSentences.length < Math.min(3, sentences.length)) {
+      const randomIndex = Math.floor(Math.random() * sentences.length);
+      if (!usedIndexes.has(randomIndex) && sentences[randomIndex]?.trim()) {
+        randomSentences.push(sentences[randomIndex].trim());
+        usedIndexes.add(randomIndex);
+      }
+    }
+    
+    return [
+      {
+        id: 1,
+        title: "Academic Journal Reference",
+        url: "https://journal.example.com/article",
+        matchPercentage: Math.floor(Math.random() * 15) + 10, // 10-25%
+        matchedText: [randomSentences[0]]
+      },
+      {
+        id: 2,
+        title: "Online Publication",
+        url: "https://publication.example.org/content",
+        matchPercentage: Math.floor(Math.random() * 10) + 5, // 5-15%
+        matchedText: [randomSentences[1]]
+      },
+      {
+        id: 3,
+        title: "Research Database",
+        url: "https://research.example.edu/database",
+        matchPercentage: Math.floor(Math.random() * 5) + 3, // 3-8%
+        matchedText: [randomSentences[2]]
+      }
+    ].filter(source => source.matchedText[0]); // Filter out sources without matched text
+  };
 
   const getHighlightedText = () => {
     if (!selectedSource) return originalText;
@@ -76,10 +146,12 @@ const ResultsPage: React.FC = () => {
     let highlightedText = originalText;
     
     source.matchedText.forEach(match => {
-      highlightedText = highlightedText.replace(
-        match,
-        `<span class="bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 px-1 rounded">${match}</span>`
-      );
+      if (match && originalText.includes(match)) {
+        highlightedText = highlightedText.replace(
+          match,
+          `<span class="bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 px-1 rounded">${match}</span>`
+        );
+      }
     });
     
     return highlightedText;
