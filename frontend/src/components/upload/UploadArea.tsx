@@ -65,23 +65,32 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
       
       const data = await response.json();
       
-      // Get the extracted text
-      const textResponse = await fetch(`http://localhost:8000/api/documents/${data.id}/extracted_text/`, {
-        credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
+      // The extracted text is now included in the response
+      if (data.extracted_text) {
+        setExtractedText(data.extracted_text);
+        
+        if (onTextExtracted) {
+          onTextExtracted(data.extracted_text);
         }
-      });
-      
-      if (!textResponse.ok) {
-        throw new Error(`Failed to get extracted text with status: ${textResponse.status}`);
-      }
-      
-      const textData = await textResponse.json();
-      setExtractedText(textData.extracted_text);
-      
-      if (onTextExtracted) {
-        onTextExtracted(textData.extracted_text);
+      } else {
+        // If for some reason the extracted text isn't in the response, fetch it
+        const textResponse = await fetch(`http://localhost:8000/api/documents/${data.id}/extracted_text/`, {
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json',
+          }
+        });
+        
+        if (!textResponse.ok) {
+          throw new Error(`Failed to get extracted text with status: ${textResponse.status}`);
+        }
+        
+        const textData = await textResponse.json();
+        setExtractedText(textData.extracted_text);
+        
+        if (onTextExtracted) {
+          onTextExtracted(textData.extracted_text);
+        }
       }
       
     } catch (error) {
@@ -242,15 +251,6 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
                 </motion.div>
                 <p className="text-secondary-500 font-medium">
                   {extractedText ? 'Text extracted successfully' : 'File ready for processing'}
-                </p>
-              </div>
-            )}
-            
-            {extractedText && (
-              <div className="mt-6 p-4 bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg text-left max-h-60 overflow-y-auto">
-                <h4 className="font-medium text-dark-800 dark:text-dark-200 mb-2">Extracted Text Preview:</h4>
-                <p className="text-dark-600 dark:text-dark-400 text-sm whitespace-pre-line">
-                  {extractedText.length > 300 ? `${extractedText.substring(0, 300)}...` : extractedText}
                 </p>
               </div>
             )}

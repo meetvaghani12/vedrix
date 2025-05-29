@@ -7,8 +7,8 @@ class DocumentSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Document
-        fields = ['id', 'title', 'file', 'file_type', 'extracted_text', 'uploaded_by', 'uploaded_at']
-        read_only_fields = ['extracted_text', 'uploaded_at', 'file_type']
+        fields = ['id', 'title', 'original_filename', 'file_type', 'extracted_text', 'uploaded_by', 'uploaded_at']
+        read_only_fields = ['extracted_text', 'uploaded_at', 'file_type', 'original_filename']
 
 class DocumentTextSerializer(serializers.ModelSerializer):
     """Serializer for returning just the extracted text."""
