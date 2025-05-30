@@ -41,6 +41,76 @@ const processTextForPDF = (text: string): string => {
   return processedText;
 };
 
+/**
+ * Breaks a list of sentences into meaningful chunks for similarity detection
+ * @param sentences List of cleaned sentences to chunk
+ * @param minSize Minimum number of sentences per chunk (default: 3)
+ * @param maxSize Maximum number of sentences per chunk (default: 5)
+ * @returns Object with chunks array
+ */
+interface ChunkedText {
+  chunks: string[];
+}
+
+const chunkTextForSimilaritySearch = (
+  sentences: string[],
+  minSize: number = 3,
+  maxSize: number = 5
+): ChunkedText => {
+  // Handle edge cases
+  if (!sentences || sentences.length === 0) {
+    return { chunks: [] };
+  }
+  
+  if (sentences.length <= maxSize) {
+    // If we have fewer sentences than maxSize, return as a single chunk
+    return { chunks: [sentences.join(' ')] };
+  }
+  
+  const chunks: string[] = [];
+  let currentChunk: string[] = [];
+  
+  // Try to detect paragraph breaks (capital letter after period) to create better chunk boundaries
+  const isParagraphStart = (index: number): boolean => {
+    if (index === 0) return true;
+    
+    const prevSentence = sentences[index - 1];
+    // Check if previous sentence ends with a period and current starts with capital
+    return prevSentence.trim().endsWith('.') && 
+           /^[A-Z]/.test(sentences[index].trim());
+  };
+  
+  // Process sentences into chunks
+  for (let i = 0; i < sentences.length; i++) {
+    currentChunk.push(sentences[i]);
+    
+    // Determine if we should complete the current chunk
+    const isLastSentence = i === sentences.length - 1;
+    const reachedMaxSize = currentChunk.length >= maxSize;
+    const atGoodBreakPoint = currentChunk.length >= minSize && isParagraphStart(i + 1);
+    
+    if (isLastSentence || reachedMaxSize || atGoodBreakPoint) {
+      // Add the current chunk to our list of chunks
+      chunks.push(currentChunk.join(' '));
+      currentChunk = [];
+    }
+  }
+  
+  // Handle any remaining sentences (should only happen if < minSize remaining)
+  if (currentChunk.length > 0) {
+    // If we have a small remainder, merge with the last chunk if possible
+    if (currentChunk.length < minSize && chunks.length > 0) {
+      const lastChunk = chunks.pop()!.split(' ');
+      const combinedChunk = [...lastChunk, ...currentChunk].join(' ');
+      chunks.push(combinedChunk);
+    } else {
+      chunks.push(currentChunk.join(' '));
+    }
+  }
+  
+  return { chunks };
+};
+
 // English stopwords list
 const ENGLISH_STOPWORDS = [
   'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 
@@ -146,6 +216,8 @@ const ResultsPage: React.FC = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
   const [processedJSON, setProcessedJSON] = useState<string>('');
   const [showJSON, setShowJSON] = useState<boolean>(false);
+  const [chunkedJSON, setChunkedJSON] = useState<string>('');
+  const [showChunks, setShowChunks] = useState<boolean>(false);
 
   // Load data from session storage or use simulated data
   useEffect(() => {
@@ -714,13 +786,37 @@ const ResultsPage: React.FC = () => {
     setShowJSON(true);
   };
 
+  const handleChunkText = () => {
+    // First tokenize the text into sentences
+    const { sentences } = processTextNLP(originalText, false);
+    
+    // Then chunk the sentences
+    const chunkedResult = chunkTextForSimilaritySearch(sentences);
+    
+    // Convert to formatted JSON string
+    const jsonOutput = JSON.stringify(chunkedResult, null, 2);
+    
+    // Set the chunked JSON
+    setChunkedJSON(jsonOutput);
+    setShowChunks(true);
+  };
+
   const handleCopyJSON = () => {
     navigator.clipboard.writeText(processedJSON);
     alert('JSON copied to clipboard!');
   };
 
+  const handleCopyChunks = () => {
+    navigator.clipboard.writeText(chunkedJSON);
+    alert('Chunks copied to clipboard!');
+  };
+
   const handleCloseJSON = () => {
     setShowJSON(false);
+  };
+
+  const handleCloseChunks = () => {
+    setShowChunks(false);
   };
 
   if (isLoading) {
@@ -784,6 +880,14 @@ const ResultsPage: React.FC = () => {
                     onClick={handleProcessText}
                   >
                     Process Text
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    icon={<FileText className="w-4 h-4" />}
+                    onClick={handleChunkText}
+                  >
+                    Chunk Text
                   </Button>
                 </div>
               </div>
@@ -1040,6 +1144,41 @@ const ResultsPage: React.FC = () => {
               <div className="flex-1 overflow-auto p-4">
                 <pre className="bg-gray-100 dark:bg-dark-900 p-4 rounded-lg text-sm text-dark-800 dark:text-dark-200 overflow-auto whitespace-pre-wrap">
                   {processedJSON}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Chunks Modal */}
+        {showChunks && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white dark:bg-dark-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-700">
+                <h3 className="text-lg font-semibold text-dark-800 dark:text-dark-200">
+                  Chunked Text
+                </h3>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    icon={<Download className="w-4 h-4" />}
+                    onClick={handleCopyChunks}
+                  >
+                    Copy JSON
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleCloseChunks}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto p-4">
+                <pre className="bg-gray-100 dark:bg-dark-900 p-4 rounded-lg text-sm text-dark-800 dark:text-dark-200 overflow-auto whitespace-pre-wrap">
+                  {chunkedJSON}
                 </pre>
               </div>
             </div>
