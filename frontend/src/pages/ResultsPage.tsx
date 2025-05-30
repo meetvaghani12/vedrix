@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Download, MessageSquare, RotateCcw, Bookmark, BookOpen, FileText } from 'lucide-react';
+import { Download, MessageSquare, RotateCcw, Bookmark, BookOpen, FileText, Code } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
@@ -41,6 +41,91 @@ const processTextForPDF = (text: string): string => {
   return processedText;
 };
 
+// English stopwords list
+const ENGLISH_STOPWORDS = [
+  'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 
+  'to', 'from', 'by', 'with', 'in', 'out', 'over', 'under', 'again',
+  'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why',
+  'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other',
+  'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so',
+  'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don',
+  'should', 'now', 'i', 'me', 'my', 'myself', 'we', 'our', 'ours',
+  'ourselves', 'you', 'your', 'yours', 'yourself', 'yourselves',
+  'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself',
+  'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves',
+  'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those',
+  'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have',
+  'has', 'had', 'having', 'do', 'does', 'did', 'doing', 'would',
+  'could', 'should', 'ought', 'i\'m', 'you\'re', 'he\'s', 'she\'s',
+  'it\'s', 'we\'re', 'they\'re', 'i\'ve', 'you\'ve', 'we\'ve', 'they\'ve',
+  'i\'d', 'you\'d', 'he\'d', 'she\'d', 'we\'d', 'they\'d', 'i\'ll',
+  'you\'ll', 'he\'ll', 'she\'ll', 'we\'ll', 'they\'ll', 'isn\'t', 'aren\'t',
+  'wasn\'t', 'weren\'t', 'hasn\'t', 'haven\'t', 'hadn\'t', 'doesn\'t',
+  'don\'t', 'didn\'t', 'won\'t', 'wouldn\'t', 'shan\'t', 'shouldn\'t',
+  'can\'t', 'cannot', 'couldn\'t', 'mustn\'t', 'let\'s', 'that\'s',
+  'who\'s', 'what\'s', 'here\'s', 'there\'s', 'when\'s', 'where\'s',
+  'why\'s', 'how\'s'
+];
+
+// NLP text processing utility
+interface ProcessedText {
+  cleaned_text: string;
+  sentences: string[];
+  tokens: string[][];
+}
+
+const processTextNLP = (text: string, removeStopwords: boolean = false): ProcessedText => {
+  // Step 1: Clean the text
+  // Normalize whitespace and line breaks
+  let cleanedText = text.replace(/\r\n/g, ' ').replace(/\r/g, ' ').replace(/\n/g, ' ');
+  
+  // Remove extra whitespace
+  cleanedText = cleanedText.replace(/\s+/g, ' ').trim();
+  
+  // Remove special characters except basic punctuation
+  cleanedText = cleanedText.replace(/[^\w\s.,?!;:'"()-]/g, '');
+  
+  // Convert to lowercase
+  cleanedText = cleanedText.toLowerCase();
+  
+  // Step 2: Tokenize into sentences
+  // Use regex to split on sentence boundaries
+  const sentenceRegex = /[.!?]+\s+/g;
+  let sentences = cleanedText.split(sentenceRegex).filter(Boolean);
+  
+  // Clean up sentences
+  sentences = sentences.map(sentence => {
+    let cleanSentence = sentence.trim();
+    // Add period if sentence doesn't end with punctuation
+    if (!/[.!?]$/.test(cleanSentence)) {
+      cleanSentence += '.';
+    }
+    // Ensure first letter is capitalized
+    return cleanSentence.charAt(0).toUpperCase() + cleanSentence.slice(1);
+  });
+  
+  // Step 3: Tokenize each sentence into words
+  const tokens = sentences.map(sentence => {
+    // Remove punctuation for tokenization
+    const cleanSentence = sentence.replace(/[.,!?;:'"()-]/g, '');
+    // Split into words
+    let words = cleanSentence.split(/\s+/).filter(Boolean);
+    
+    // Remove stopwords if requested
+    if (removeStopwords) {
+      words = words.filter(word => !ENGLISH_STOPWORDS.includes(word.toLowerCase()));
+    }
+    
+    return words;
+  });
+  
+  return {
+    cleaned_text: sentences.join(' '),
+    sentences,
+    tokens
+  };
+};
+
 interface Source {
   id: number;
   title: string;
@@ -59,6 +144,8 @@ const ResultsPage: React.FC = () => {
   const [originalFilename, setOriginalFilename] = useState<string>('');
   const reportRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
+  const [processedJSON, setProcessedJSON] = useState<string>('');
+  const [showJSON, setShowJSON] = useState<boolean>(false);
 
   // Load data from session storage or use simulated data
   useEffect(() => {
@@ -615,6 +702,27 @@ const ResultsPage: React.FC = () => {
     }
   };
 
+  const handleProcessText = () => {
+    // Process the text using NLP
+    const nlpResult = processTextNLP(originalText, true);
+    
+    // Convert to formatted JSON string
+    const jsonOutput = JSON.stringify(nlpResult, null, 2);
+    
+    // Set the processed JSON
+    setProcessedJSON(jsonOutput);
+    setShowJSON(true);
+  };
+
+  const handleCopyJSON = () => {
+    navigator.clipboard.writeText(processedJSON);
+    alert('JSON copied to clipboard!');
+  };
+
+  const handleCloseJSON = () => {
+    setShowJSON(false);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-[600px] flex items-center justify-center">
@@ -668,6 +776,14 @@ const ResultsPage: React.FC = () => {
                     onClick={handleRescan}
                   >
                     Rescan
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    icon={<Code className="w-4 h-4" />}
+                    onClick={handleProcessText}
+                  >
+                    Process Text
                   </Button>
                 </div>
               </div>
@@ -894,6 +1010,41 @@ const ResultsPage: React.FC = () => {
             </Card>
           </div>
         </div>
+
+        {/* JSON Modal */}
+        {showJSON && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white dark:bg-dark-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-700">
+                <h3 className="text-lg font-semibold text-dark-800 dark:text-dark-200">
+                  NLP Processed Text
+                </h3>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    icon={<Download className="w-4 h-4" />}
+                    onClick={handleCopyJSON}
+                  >
+                    Copy JSON
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleCloseJSON}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto p-4">
+                <pre className="bg-gray-100 dark:bg-dark-900 p-4 rounded-lg text-sm text-dark-800 dark:text-dark-200 overflow-auto whitespace-pre-wrap">
+                  {processedJSON}
+                </pre>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
