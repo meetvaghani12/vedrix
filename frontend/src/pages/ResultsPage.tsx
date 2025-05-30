@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Download, MessageSquare, RotateCcw, Bookmark, BookOpen, FileText, Code } from 'lucide-react';
+import { Download, MessageSquare, RotateCcw, Bookmark, BookOpen, FileText, Code, Search } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
@@ -204,6 +204,32 @@ interface Source {
   matchedText: string[];
 }
 
+// Interface for Google Search API configuration
+interface GoogleSearchConfig {
+  apiKey: string;
+  searchEngineId: string;
+  maxResults?: number;
+}
+
+// Interface for search result
+interface SearchResult {
+  title: string;
+  link: string;
+  snippet: string;
+  htmlSnippet?: string;
+  formattedUrl?: string;
+  source?: string;
+}
+
+// Interface for chunk search results
+interface ChunkSearchResults {
+  chunkId: number;
+  chunkText: string;
+  query: string;
+  results: SearchResult[];
+  error?: string;
+}
+
 const ResultsPage: React.FC = () => {
   const navigate = useNavigate();
   const [originalText, setOriginalText] = useState<string>('');
@@ -218,6 +244,16 @@ const ResultsPage: React.FC = () => {
   const [showJSON, setShowJSON] = useState<boolean>(false);
   const [chunkedJSON, setChunkedJSON] = useState<string>('');
   const [showChunks, setShowChunks] = useState<boolean>(false);
+  const [searchResults, setSearchResults] = useState<ChunkSearchResults[]>([]);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
+  const [showSearchResults, setShowSearchResults] = useState<boolean>(false);
+  const [searchConfig, setSearchConfig] = useState<GoogleSearchConfig>({
+    apiKey: '',
+    searchEngineId: '',
+    maxResults: 5
+  });
+  const [configError, setConfigError] = useState<string>('');
+  const [showSearchConfig, setShowSearchConfig] = useState<boolean>(false);
 
   // Load data from session storage or use simulated data
   useEffect(() => {
@@ -819,6 +855,156 @@ const ResultsPage: React.FC = () => {
     setShowChunks(false);
   };
 
+  // Helper function to search for similar content using Google Programmable Search API
+  const searchSimilarContent = async (
+    chunk: string,
+    config: GoogleSearchConfig,
+    chunkId: number = 0
+  ): Promise<ChunkSearchResults> => {
+    try {
+      // Create a search query from the chunk
+      // For better results, take first ~150 characters as they're often most relevant
+      const queryText = chunk.substring(0, 150).trim();
+      
+      // Construct the API URL with parameters
+      const url = new URL('https://www.googleapis.com/customsearch/v1');
+      url.searchParams.append('key', config.apiKey);
+      url.searchParams.append('cx', config.searchEngineId);
+      url.searchParams.append('q', queryText);
+      url.searchParams.append('num', String(config.maxResults || 5));
+      
+      // Send the request
+      const response = await fetch(url.toString());
+      
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Extract the search results
+      const results: SearchResult[] = data.items?.map((item: any) => ({
+        title: item.title,
+        link: item.link,
+        snippet: item.snippet,
+        htmlSnippet: item.htmlSnippet,
+        formattedUrl: item.formattedUrl,
+        source: item.displayLink
+      })) || [];
+      
+      return {
+        chunkId,
+        chunkText: chunk,
+        query: queryText,
+        results
+      };
+    } catch (error) {
+      console.error(`Error searching for chunk ${chunkId}:`, error);
+      return {
+        chunkId,
+        chunkText: chunk,
+        query: chunk.substring(0, 150).trim(),
+        results: [],
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  };
+
+  // Helper function to search for similar content for multiple chunks with rate limiting
+  const batchSearchSimilarContent = async (
+    chunks: string[],
+    config: GoogleSearchConfig,
+    delayMs: number = 2000
+  ): Promise<ChunkSearchResults[]> => {
+    const results: ChunkSearchResults[] = [];
+    
+    // Process chunks sequentially with delay to respect rate limits
+    for (let i = 0; i < chunks.length; i++) {
+      try {
+        // Search for the current chunk
+        const result = await searchSimilarContent(chunks[i], config, i);
+        results.push(result);
+        
+        // Log progress
+        console.log(`Processed chunk ${i + 1}/${chunks.length}`);
+        
+        // Add delay between requests (except for the last one)
+        if (i < chunks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      } catch (error) {
+        console.error(`Error processing chunk ${i}:`, error);
+        results.push({
+          chunkId: i,
+          chunkText: chunks[i],
+          query: chunks[i].substring(0, 150).trim(),
+          results: [],
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+    
+    return results;
+  };
+
+  // Handle search for similar content
+  const handleSearchSimilarContent = async () => {
+    // Validate API key and Search Engine ID
+    if (!searchConfig.apiKey) {
+      setConfigError('API Key is required');
+      return;
+    }
+    
+    if (!searchConfig.searchEngineId) {
+      setConfigError('Search Engine ID is required');
+      return;
+    }
+    
+    setConfigError('');
+    setIsSearching(true);
+    
+    try {
+      // First tokenize the text into sentences
+      const { sentences } = processTextNLP(originalText, false);
+      
+      // Then chunk the sentences
+      const { chunks } = chunkTextForSimilaritySearch(sentences);
+      
+      // Start the search process with rate limiting
+      const results = await batchSearchSimilarContent(chunks, searchConfig);
+      
+      // Update state with results
+      setSearchResults(results);
+      setShowSearchResults(true);
+    } catch (error) {
+      console.error('Error searching for similar content:', error);
+      setConfigError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Handle API key change
+  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchConfig(prev => ({ ...prev, apiKey: e.target.value }));
+  };
+
+  // Handle Search Engine ID change
+  const handleSearchEngineIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchConfig(prev => ({ ...prev, searchEngineId: e.target.value }));
+  };
+
+  // Handle max results change
+  const handleMaxResultsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value, 10);
+    setSearchConfig(prev => ({ ...prev, maxResults: isNaN(value) ? 5 : value }));
+  };
+
+  // Close search results modal
+  const handleCloseSearchResults = () => {
+    setShowSearchResults(false);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-[600px] flex items-center justify-center">
@@ -888,6 +1074,14 @@ const ResultsPage: React.FC = () => {
                     onClick={handleChunkText}
                   >
                     Chunk Text
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={<Search className="w-4 h-4" />}
+                    onClick={() => setShowSearchConfig(true)}
+                  >
+                    Search Similar
                   </Button>
                 </div>
               </div>
@@ -1180,6 +1374,188 @@ const ResultsPage: React.FC = () => {
                 <pre className="bg-gray-100 dark:bg-dark-900 p-4 rounded-lg text-sm text-dark-800 dark:text-dark-200 overflow-auto whitespace-pre-wrap">
                   {chunkedJSON}
                 </pre>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Search Configuration Modal */}
+        {showSearchConfig && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white dark:bg-dark-800 rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-700">
+                <h3 className="text-lg font-semibold text-dark-800 dark:text-dark-200">
+                  Google Search API Configuration
+                </h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowSearchConfig(false)}
+                >
+                  Close
+                </Button>
+              </div>
+              <div className="p-4">
+                {configError && (
+                  <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg">
+                    {configError}
+                  </div>
+                )}
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-1">
+                      Google API Key
+                    </label>
+                    <input
+                      type="text"
+                      value={searchConfig.apiKey}
+                      onChange={handleApiKeyChange}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-dark-700 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-dark-900 dark:text-dark-200"
+                      placeholder="Enter your Google API Key"
+                    />
+                    <p className="mt-1 text-xs text-dark-500 dark:text-dark-400">
+                      Get an API key from the <a href="https://developers.google.com/custom-search/v1/overview" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Google Custom Search API</a>
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-1">
+                      Custom Search Engine ID
+                    </label>
+                    <input
+                      type="text"
+                      value={searchConfig.searchEngineId}
+                      onChange={handleSearchEngineIdChange}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-dark-700 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-dark-900 dark:text-dark-200"
+                      placeholder="Enter your Search Engine ID"
+                    />
+                    <p className="mt-1 text-xs text-dark-500 dark:text-dark-400">
+                      Create a search engine at the <a href="https://programmablesearchengine.google.com/about/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Programmable Search Engine</a>
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-1">
+                      Max Results Per Chunk
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={searchConfig.maxResults}
+                      onChange={handleMaxResultsChange}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-dark-700 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-dark-900 dark:text-dark-200"
+                      placeholder="5"
+                    />
+                    <p className="mt-1 text-xs text-dark-500 dark:text-dark-400">
+                      Maximum number of results to retrieve per chunk (1-10)
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="mt-6">
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    icon={<Search className="w-4 h-4" />}
+                    onClick={handleSearchSimilarContent}
+                    disabled={isSearching}
+                  >
+                    {isSearching ? 'Searching...' : 'Search for Similar Content'}
+                  </Button>
+                  
+                  <p className="mt-4 text-xs text-dark-500 dark:text-dark-400 text-center">
+                    Note: Google API has a quota limit of 100 queries per day for free accounts. 
+                    Searches will be rate-limited to respect API quotas.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Search Results Modal */}
+        {showSearchResults && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+            <div className="bg-white dark:bg-dark-800 rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-700">
+                <h3 className="text-lg font-semibold text-dark-800 dark:text-dark-200">
+                  Similarity Search Results
+                </h3>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleCloseSearchResults}
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-auto p-4">
+                {searchResults.length === 0 ? (
+                  <div className="text-center py-10">
+                    <p className="text-dark-500 dark:text-dark-400">No search results found.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {searchResults.map((chunkResult) => (
+                      <div key={chunkResult.chunkId} className="border border-gray-200 dark:border-dark-700 rounded-lg overflow-hidden">
+                        <div className="bg-gray-50 dark:bg-dark-900/50 p-4 border-b border-gray-200 dark:border-dark-700">
+                          <h4 className="font-medium text-dark-800 dark:text-dark-200 mb-2">
+                            Chunk #{chunkResult.chunkId + 1}
+                          </h4>
+                          <div className="bg-white dark:bg-dark-900 p-3 rounded-lg text-sm text-dark-600 dark:text-dark-400 mb-2">
+                            <strong>Text:</strong> {chunkResult.chunkText}
+                          </div>
+                          <div className="text-sm text-dark-500 dark:text-dark-400">
+                            <strong>Search Query:</strong> {chunkResult.query}
+                          </div>
+                          {chunkResult.error && (
+                            <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded text-sm">
+                              Error: {chunkResult.error}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="p-4">
+                          <h5 className="font-medium text-dark-700 dark:text-dark-300 mb-3">
+                            {chunkResult.results.length} Similar Sources Found:
+                          </h5>
+                          
+                          {chunkResult.results.length === 0 ? (
+                            <p className="text-dark-500 dark:text-dark-400 text-sm italic">No similar content found for this chunk.</p>
+                          ) : (
+                            <div className="space-y-4">
+                              {chunkResult.results.map((result, index) => (
+                                <div key={index} className="bg-gray-50 dark:bg-dark-900/30 p-3 rounded-lg">
+                                  <h6 className="font-medium text-primary-700 dark:text-primary-400 mb-1">
+                                    {result.title}
+                                  </h6>
+                                  <a 
+                                    href={result.link} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-500 hover:underline mb-2 block"
+                                  >
+                                    {result.formattedUrl || result.link}
+                                  </a>
+                                  <p className="text-sm text-dark-600 dark:text-dark-400 mt-2">
+                                    {result.snippet}
+                                  </p>
+                                  <div className="text-xs text-dark-500 dark:text-dark-400 mt-2">
+                                    Source: {result.source}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
