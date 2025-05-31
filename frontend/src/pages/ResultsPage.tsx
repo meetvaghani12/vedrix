@@ -303,6 +303,7 @@ const ResultsPage: React.FC = () => {
   });
   const [configError, setConfigError] = useState<string>('');
   const [showSearchConfig, setShowSearchConfig] = useState<boolean>(false);
+  const [searchProgress, setSearchProgress] = useState(0);
 
   // Load data from session storage or use simulated data
   useEffect(() => {
@@ -365,25 +366,28 @@ const ResultsPage: React.FC = () => {
 
   // Function to perform similarity search
   const performSimilaritySearch = async () => {
-    // Check if API keys are available - try to get directly from window.env first
     const apiKey = window.env?.REACT_APP_GOOGLE_API_KEY || getApiKey();
     const searchEngineId = window.env?.REACT_APP_GOOGLE_SEARCH_ENGINE_ID || getSearchEngineId();
     
-    // Debug logging for environment variables
-    console.log('Environment variables check:');
-    console.log('- API Key available:', apiKey ? 'Yes (length: ' + apiKey.length + ')' : 'No');
-    console.log('- Search Engine ID available:', searchEngineId ? 'Yes (length: ' + searchEngineId.length + ')' : 'No');
-    console.log('- window.env object exists:', window.env ? 'Yes' : 'No');
-    
     if (!apiKey || !searchEngineId) {
       console.error('Google Search API keys not configured in environment variables');
-      // If API keys are not available, we can't perform analysis
-      console.log('Cannot perform plagiarism analysis without API keys');
       return;
     }
     
     setIsSearching(true);
-    
+    setSearchProgress(0);
+
+    // Progress simulation interval
+    const progressInterval = setInterval(() => {
+      setSearchProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + 5;
+      });
+    }, 1000);
+
     try {
       // First tokenize the text into sentences
       const { sentences } = processTextNLP(originalText, false);
@@ -404,8 +408,28 @@ const ResultsPage: React.FC = () => {
       // Update sources based on search results
       updateSourcesFromSearchResults(results);
       
+      clearInterval(progressInterval);
+      setSearchProgress(100);
+      
+      // If we found sources, use them
+      if (sources.length > 0) {
+        setSources(sources);
+        
+        // Calculate overall plagiarism score based on total matched text
+        const overallMatchPercentage = Math.min(100, Math.round((totalMatchedLength / totalTextLength) * 100));
+        
+        // Originality score is inverse of match percentage
+        const newScore = 100 - overallMatchPercentage;
+        
+        // Apply score with minimum threshold
+        setOverallScore(Math.max(newScore, 5));
+        
+        console.log(`Calculated plagiarism score: ${overallMatchPercentage}%, originality: ${newScore}%`);
+      }
     } catch (error) {
-      console.error('Error searching for similar content:', error);
+      console.error('Error performing similarity search:', error);
+      clearInterval(progressInterval);
+      setSearchProgress(0);
     } finally {
       setIsSearching(false);
     }
@@ -1244,12 +1268,54 @@ const ResultsPage: React.FC = () => {
     setShowSearchResults(false);
   };
 
-  if (isLoading) {
+  if (isLoading || isSearching) {
     return (
       <div className="min-h-[600px] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-dark-600 dark:text-dark-400">Loading results...</p>
+          <div className="relative w-24 h-24 mx-auto mb-6">
+            <div className="absolute inset-0">
+              <svg className="w-24 h-24" viewBox="0 0 100 100">
+                <circle
+                  className="text-gray-200 dark:text-gray-700"
+                  strokeWidth="8"
+                  stroke="currentColor"
+                  fill="transparent"
+                  r="42"
+                  cx="50"
+                  cy="50"
+                />
+                <circle
+                  className="text-primary-500"
+                  strokeWidth="8"
+                  strokeDasharray={264}
+                  strokeDashoffset={264 - (264 * (isLoading ? 100 : searchProgress)) / 100}
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="transparent"
+                  r="42"
+                  cx="50"
+                  cy="50"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-lg font-semibold">
+                  {isLoading ? '' : `${searchProgress}%`}
+                </span>
+              </div>
+            </div>
+          </div>
+          <p className="text-lg font-medium text-dark-900 dark:text-dark-100 mb-2">
+            {isLoading ? 'Loading document...' : 'Analyzing document...'}
+          </p>
+          <p className="text-sm text-dark-600 dark:text-dark-400">
+            {isLoading 
+              ? 'Please wait while we prepare your document'
+              : searchProgress < 50
+                ? 'Searching for similar content...'
+                : searchProgress < 80
+                  ? 'Comparing text segments...'
+                  : 'Calculating originality score...'}
+          </p>
         </div>
       </div>
     );

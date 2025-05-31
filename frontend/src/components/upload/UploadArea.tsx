@@ -12,6 +12,7 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [extractedText, setExtractedText] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,37 +43,52 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
 
   const uploadFile = async (file: File) => {
     setIsUploading(true);
+    setUploadProgress(0);
     
     try {
       const formData = new FormData();
       formData.append('title', file.name);
       formData.append('file', file);
+
+      // Simulate upload progress since we can't get real progress from the server
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 500);
       
       const response = await fetch('http://localhost:8000/api/documents/', {
         method: 'POST',
         body: formData,
         credentials: 'include',
         headers: {
-          // Don't set Content-Type header when using FormData
-          // browser will automatically set the correct boundary
           'Accept': 'application/json',
         }
       });
+      
+      clearInterval(progressInterval);
       
       if (!response.ok) {
         throw new Error(`Upload failed with status: ${response.status}`);
       }
       
+      setUploadProgress(95);
       const data = await response.json();
       
       // The extracted text is now included in the response
       if (data.extracted_text) {
+        setUploadProgress(100);
         setExtractedText(data.extracted_text);
         
         if (onTextExtracted) {
           onTextExtracted(data.extracted_text);
         }
       } else {
+        setUploadProgress(95);
         // If for some reason the extracted text isn't in the response, fetch it
         const textResponse = await fetch(`http://localhost:8000/api/documents/${data.id}/extracted_text/`, {
           credentials: 'include',
@@ -86,6 +102,7 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
         }
         
         const textData = await textResponse.json();
+        setUploadProgress(100);
         setExtractedText(textData.extracted_text);
         
         if (onTextExtracted) {
@@ -96,6 +113,7 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
     } catch (error) {
       console.error('Error uploading file:', error);
       setUploadError('Failed to upload file. Please try again.');
+      setUploadProgress(0);
     } finally {
       setIsUploading(false);
     }
@@ -219,14 +237,55 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
               </button>
             </div>
             
-            {isUploading && (
-              <div className="mt-6">
-                <div className="w-full bg-gray-200 dark:bg-dark-700 rounded-full h-2">
-                  <div className="h-full rounded-full bg-primary-500 animate-pulse" style={{ width: '100%' }}></div>
+            {isUploading ? (
+              <div className="mt-6 flex flex-col items-center justify-center space-y-4">
+                <div className="relative w-20 h-20">
+                  <div className="absolute inset-0">
+                    <svg className="w-20 h-20" viewBox="0 0 100 100">
+                      <circle
+                        className="text-gray-200 dark:text-gray-700"
+                        strokeWidth="8"
+                        stroke="currentColor"
+                        fill="transparent"
+                        r="42"
+                        cx="50"
+                        cy="50"
+                      />
+                      <circle
+                        className="text-primary-500"
+                        strokeWidth="8"
+                        strokeDasharray={264}
+                        strokeDashoffset={264 - (264 * uploadProgress) / 100}
+                        strokeLinecap="round"
+                        stroke="currentColor"
+                        fill="transparent"
+                        r="42"
+                        cx="50"
+                        cy="50"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-lg font-semibold">{uploadProgress}%</span>
+                    </div>
+                  </div>
                 </div>
-                <p className="mt-2 text-sm text-dark-500 dark:text-dark-400">
-                  Uploading and extracting text...
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {uploadProgress < 95 ? 'Uploading document...' : 'Processing text...'}
                 </p>
+              </div>
+            ) : (
+              <div className="mt-6 flex items-center justify-center">
+                <motion.div 
+                  initial={{ scale: 0, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.2 }}
+                  className="w-8 h-8 rounded-full bg-secondary-500 flex items-center justify-center mr-2"
+                >
+                  <Check className="w-5 h-5 text-white" />
+                </motion.div>
+                  <p className="text-secondary-500 font-medium">
+                    {extractedText ? 'Text extracted successfully' : 'File ready for processing'}
+                  </p>
               </div>
             )}
             
@@ -237,22 +296,6 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
                   <p>{uploadError}</p>
                 </div>
               </div>
-            )}
-            
-            {!isUploading && !uploadError && (
-            <div className="mt-6 flex items-center justify-center">
-              <motion.div 
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.2 }}
-                className="w-8 h-8 rounded-full bg-secondary-500 flex items-center justify-center mr-2"
-              >
-                <Check className="w-5 h-5 text-white" />
-              </motion.div>
-                <p className="text-secondary-500 font-medium">
-                  {extractedText ? 'Text extracted successfully' : 'File ready for processing'}
-                </p>
-            </div>
             )}
           </div>
         )}
