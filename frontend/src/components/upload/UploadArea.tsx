@@ -240,19 +240,19 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
             )}
             
             {!isUploading && !uploadError && (
-              <div className="mt-6 flex items-center justify-center">
-                <motion.div 
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.2 }}
-                  className="w-8 h-8 rounded-full bg-secondary-500 flex items-center justify-center mr-2"
-                >
-                  <Check className="w-5 h-5 text-white" />
-                </motion.div>
+            <div className="mt-6 flex items-center justify-center">
+              <motion.div 
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.2 }}
+                className="w-8 h-8 rounded-full bg-secondary-500 flex items-center justify-center mr-2"
+              >
+                <Check className="w-5 h-5 text-white" />
+              </motion.div>
                 <p className="text-secondary-500 font-medium">
                   {extractedText ? 'Text extracted successfully' : 'File ready for processing'}
                 </p>
-              </div>
+            </div>
             )}
           </div>
         )}

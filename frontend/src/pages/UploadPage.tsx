@@ -19,7 +19,7 @@ const UploadPage: React.FC = () => {
   const handleTextExtracted = (text: string) => {
     setExtractedText(text);
   };
-  
+
   const copyToClipboard = async () => {
     if (extractedText) {
       try {
@@ -50,8 +50,8 @@ const UploadPage: React.FC = () => {
       sessionStorage.setItem('originalFilename', selectedFile.name);
       
       // Navigate to results page
-      navigate('/results');
-    }
+            navigate('/results');
+        }
   };
 
   return (
@@ -92,7 +92,7 @@ const UploadPage: React.FC = () => {
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-semibold text-dark-800 dark:text-dark-200">
                       Extracted Text
-                    </h3>
+                </h3>
                     <div className="flex space-x-2">
                       <Button
                         variant="outline"
@@ -111,7 +111,7 @@ const UploadPage: React.FC = () => {
                         Download
                       </Button>
                     </div>
-                  </div>
+                      </div>
                   
                   <div className="bg-gray-50 dark:bg-dark-800 border border-gray-200 dark:border-dark-700 rounded-lg p-4 max-h-96 overflow-y-auto">
                     <pre className="text-dark-700 dark:text-dark-300 whitespace-pre-wrap font-sans text-sm">
@@ -119,7 +119,7 @@ const UploadPage: React.FC = () => {
                         ? extractedText 
                         : `${extractedText.substring(0, 1000)}...`}
                     </pre>
-                  </div>
+                    </div>
                   
                   {extractedText.length > 1000 && (
                     <div className="mt-4 text-center">
@@ -142,10 +142,10 @@ const UploadPage: React.FC = () => {
                     >
                       Continue to Analysis
                     </Button>
-                  </div>
+                    </div>
                 </div>
-              </motion.div>
-            )}
+            </motion.div>
+          )}
           </Card>
         </motion.div>
       </div>

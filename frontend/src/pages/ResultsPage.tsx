@@ -7,6 +7,55 @@ import { useNavigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
+// Define environment variables for TypeScript
+declare global {
+  interface Window {
+    env: {
+      REACT_APP_GOOGLE_API_KEY?: string;
+      REACT_APP_GOOGLE_SEARCH_ENGINE_ID?: string;
+    }
+  }
+}
+
+// Get API keys from environment variables
+const getApiKey = (): string => {
+  try {
+    // Try to access from window.env first
+    if (window.env?.REACT_APP_GOOGLE_API_KEY) {
+      return window.env.REACT_APP_GOOGLE_API_KEY;
+    }
+    
+    // Try to access from import.meta.env (for Vite)
+    // @ts-ignore - Ignore TypeScript errors for environment variable access
+    const envApiKey = import.meta?.env?.REACT_APP_GOOGLE_API_KEY || 
+                     import.meta?.env?.VITE_GOOGLE_API_KEY;
+    
+    return envApiKey || '';
+  } catch (error) {
+    console.error('Error accessing API key:', error);
+    return '';
+  }
+};
+
+const getSearchEngineId = (): string => {
+  try {
+    // Try to access from window.env first
+    if (window.env?.REACT_APP_GOOGLE_SEARCH_ENGINE_ID) {
+      return window.env.REACT_APP_GOOGLE_SEARCH_ENGINE_ID;
+    }
+    
+    // Try to access from import.meta.env (for Vite)
+    // @ts-ignore - Ignore TypeScript errors for environment variable access
+    const envSearchEngineId = import.meta?.env?.REACT_APP_GOOGLE_SEARCH_ENGINE_ID || 
+                             import.meta?.env?.VITE_GOOGLE_SEARCH_ENGINE_ID;
+    
+    return envSearchEngineId || '';
+  } catch (error) {
+    console.error('Error accessing Search Engine ID:', error);
+    return '';
+  }
+};
+
 // Helper function for PDF text wrapping
 const addWrappedText = (pdf: jsPDF, text: string, x: number, y: number, maxWidth: number, lineHeight: number): number => {
   const lines = pdf.splitTextToSize(text, maxWidth);
@@ -248,8 +297,8 @@ const ResultsPage: React.FC = () => {
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [showSearchResults, setShowSearchResults] = useState<boolean>(false);
   const [searchConfig, setSearchConfig] = useState<GoogleSearchConfig>({
-    apiKey: '',
-    searchEngineId: '',
+    apiKey: getApiKey(),
+    searchEngineId: getSearchEngineId(),
     maxResults: 5
   });
   const [configError, setConfigError] = useState<string>('');
@@ -270,112 +319,260 @@ const ResultsPage: React.FC = () => {
       if (extractedText) {
         setOriginalText(extractedText);
         
-        // Generate mock sources based on the extracted text
-        const mockSources = generateMockSources(extractedText);
-        setSources(mockSources);
+        // Start plagiarism detection immediately if API keys are available
+        const apiKey = getApiKey();
+        const searchEngineId = getSearchEngineId();
         
-        // Calculate a mock score (this would be replaced with real analysis)
-        setOverallScore(Math.floor(Math.random() * 20) + 75); // Random score between 75-95%
+        if (apiKey && searchEngineId) {
+          console.log('API keys available - running actual plagiarism analysis');
+        } else {
+          console.log('API keys not available - cannot perform plagiarism analysis');
+          // Initialize with empty sources until API can be called
+          setSources([]);
+          setOverallScore(100); // Default to 100% original
+        }
       } else {
-        // Fallback to sample text if no extracted text is available
-        const sampleText = `The concept of artificial intelligence has been a subject of fascination for decades. As technology advances, the ethical implications of AI become increasingly important to consider. Researchers argue that responsible development of AI systems must include considerations of fairness, transparency, and accountability. The potential for AI to transform industries is significant, but challenges remain in ensuring these systems operate in ways that benefit society as a whole.`;
-        
-        setOriginalText(sampleText);
-        
-        const mockSources: Source[] = [
-          {
-            id: 1,
-            title: "Ethical Implications of Artificial Intelligence",
-            url: "https://journal.ai/ethical-implications",
-            matchPercentage: 23,
-            matchedText: [
-              "ethical implications of AI become increasingly important to consider",
-              "responsible development of AI systems must include considerations of fairness, transparency, and accountability"
-            ]
-          },
-          {
-            id: 2,
-            title: "The Future of AI Technology",
-            url: "https://techreview.org/ai-future",
-            matchPercentage: 17,
-            matchedText: [
-              "The concept of artificial intelligence has been a subject of fascination for decades",
-              "The potential for AI to transform industries is significant"
-            ]
-          },
-          {
-            id: 3,
-            title: "AI and Society: Challenges and Opportunities",
-            url: "https://airesearch.edu/society-challenges",
-            matchPercentage: 8,
-            matchedText: [
-              "challenges remain in ensuring these systems operate in ways that benefit society as a whole"
-            ]
-          },
-        ];
-        
-        setSources(mockSources);
-        setOverallScore(85); // 85% original, 15% plagiarized
+        // No extracted text available, can't proceed with analysis
+        console.error('No extracted text available for analysis');
+        setOriginalText('');
+        setSources([]);
+        setOverallScore(100);
       }
       
-      setSelectedSource(1);
       setIsLoading(false);
     }, 1000);
     
     return () => clearTimeout(timer);
   }, []);
 
-  // Helper function to generate mock sources based on extracted text
-  const generateMockSources = (text: string): Source[] => {
-    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20);
+  // Automatically search for similar content when document is loaded
+  useEffect(() => {
+    // Only run this effect when originalText is available and we're not loading
+    if (originalText && !isLoading) {
+      // Check if API keys are available
+      const apiKey = getApiKey();
+      const searchEngineId = getSearchEngineId();
+      
+      if (apiKey && searchEngineId) {
+        // If keys are available, perform real search
+        performSimilaritySearch();
+      } else {
+        // If keys are not available, we can't perform analysis
+        console.log('API keys not available - cannot perform plagiarism analysis');
+      }
+    }
+  }, [originalText, isLoading]);
+
+  // Function to perform similarity search
+  const performSimilaritySearch = async () => {
+    // Check if API keys are available - try to get directly from window.env first
+    const apiKey = window.env?.REACT_APP_GOOGLE_API_KEY || getApiKey();
+    const searchEngineId = window.env?.REACT_APP_GOOGLE_SEARCH_ENGINE_ID || getSearchEngineId();
     
-    if (sentences.length < 3) {
-      return [
-        {
-          id: 1,
-          title: "Academic Source",
-          url: "https://example.com/academic-source",
-          matchPercentage: 5,
-          matchedText: [sentences[0] || "Sample matched text"]
+    // Debug logging for environment variables
+    console.log('Environment variables check:');
+    console.log('- API Key available:', apiKey ? 'Yes (length: ' + apiKey.length + ')' : 'No');
+    console.log('- Search Engine ID available:', searchEngineId ? 'Yes (length: ' + searchEngineId.length + ')' : 'No');
+    console.log('- window.env object exists:', window.env ? 'Yes' : 'No');
+    
+    if (!apiKey || !searchEngineId) {
+      console.error('Google Search API keys not configured in environment variables');
+      // If API keys are not available, we can't perform analysis
+      console.log('Cannot perform plagiarism analysis without API keys');
+      return;
+    }
+    
+    setIsSearching(true);
+    
+    try {
+      // First tokenize the text into sentences
+      const { sentences } = processTextNLP(originalText, false);
+      
+      // Then chunk the sentences
+      const { chunks } = chunkTextForSimilaritySearch(sentences);
+      
+      // Start the search process with rate limiting
+      const results = await batchSearchSimilarContent(chunks, {
+        apiKey,
+        searchEngineId,
+        maxResults: searchConfig.maxResults
+      });
+      
+      // Update state with results
+      setSearchResults(results);
+      
+      // Update sources based on search results
+      updateSourcesFromSearchResults(results);
+      
+    } catch (error) {
+      console.error('Error searching for similar content:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Update sources based on search results
+  const updateSourcesFromSearchResults = (results: ChunkSearchResults[]) => {
+    // Create new sources from search results
+    const newSources: Source[] = [];
+    let sourceId = 1;
+    
+    // Track total text length for percentage calculations
+    const totalTextLength = originalText.length;
+    let totalMatchedLength = 0;
+    
+    // Store matched text segments for highlighting
+    const matchedSegments: {text: string, sourceId: number}[] = [];
+    
+    results.forEach(chunkResult => {
+      chunkResult.results.forEach(result => {
+        // Calculate similarity score using text comparison algorithms
+        const matchScore = calculateSimilarityScore(chunkResult.chunkText, result.snippet);
+        
+        // Calculate match percentage based on chunk length and match score
+        const chunkLength = chunkResult.chunkText.length;
+        const effectiveMatchLength = chunkLength * matchScore;
+        totalMatchedLength += effectiveMatchLength;
+        
+        // Convert to percentage (0-100)
+        const matchPercentage = Math.round(matchScore * 100);
+        
+        // Only include sources with significant matches
+        if (matchPercentage > 3) {
+          const sourceId = newSources.length + 1;
+          
+          // Find specific matching text segments
+          const matchedTextSegments = findMatchingSegments(chunkResult.chunkText, result.snippet);
+          
+          newSources.push({
+            id: sourceId,
+            title: result.title,
+            url: result.link,
+            matchPercentage,
+            matchedText: matchedTextSegments.length > 0 ? matchedTextSegments : [result.snippet]
+          });
+          
+          // Store matched segments for highlighting
+          matchedTextSegments.forEach(segment => {
+            matchedSegments.push({
+              text: segment,
+              sourceId
+            });
+          });
         }
-      ];
+      });
+    });
+    
+    // If we found sources, use them
+    if (newSources.length > 0) {
+      setSources(newSources);
+      
+      // Calculate overall plagiarism score based on total matched text
+      const overallMatchPercentage = Math.min(100, Math.round((totalMatchedLength / totalTextLength) * 100));
+      
+      // Originality score is inverse of match percentage
+      const newScore = 100 - overallMatchPercentage;
+      
+      // Apply score with minimum threshold
+      setOverallScore(Math.max(newScore, 5));
+      
+      console.log(`Calculated plagiarism score: ${overallMatchPercentage}%, originality: ${newScore}%`);
     }
+  };
+  
+  // Find specific matching text segments between two texts
+  const findMatchingSegments = (text1: string, text2: string): string[] => {
+    const segments: string[] = [];
     
-    // Take 3 random sentences to use as "matched" text
-    const randomSentences = [];
-    const usedIndexes = new Set<number>();
+    // Normalize texts
+    const normalizedText1 = text1.toLowerCase();
+    const normalizedText2 = text2.toLowerCase();
     
-    while (randomSentences.length < Math.min(3, sentences.length)) {
-      const randomIndex = Math.floor(Math.random() * sentences.length);
-      if (!usedIndexes.has(randomIndex) && sentences[randomIndex]?.trim()) {
-        randomSentences.push(sentences[randomIndex].trim());
-        usedIndexes.add(randomIndex);
+    // Extract phrases from text2 (3+ words)
+    const phrases = extractPhrases(normalizedText2, 3);
+    
+    // Check each phrase for matches in text1
+    for (const phrase of phrases) {
+      if (phrase.length < 15) continue; // Skip very short phrases
+      
+      if (normalizedText1.includes(phrase)) {
+        // Find the actual case-preserved text from original
+        const startIndex = text1.toLowerCase().indexOf(phrase);
+        if (startIndex >= 0) {
+          const originalPhrase = text1.substring(startIndex, startIndex + phrase.length);
+          if (!segments.includes(originalPhrase)) {
+            segments.push(originalPhrase);
+          }
+        }
       }
     }
     
-    return [
-      {
-        id: 1,
-        title: "Academic Journal Reference",
-        url: "https://journal.example.com/article",
-        matchPercentage: Math.floor(Math.random() * 15) + 10, // 10-25%
-        matchedText: [randomSentences[0]]
-      },
-      {
-        id: 2,
-        title: "Online Publication",
-        url: "https://publication.example.org/content",
-        matchPercentage: Math.floor(Math.random() * 10) + 5, // 5-15%
-        matchedText: [randomSentences[1]]
-      },
-      {
-        id: 3,
-        title: "Research Database",
-        url: "https://research.example.edu/database",
-        matchPercentage: Math.floor(Math.random() * 5) + 3, // 3-8%
-        matchedText: [randomSentences[2]]
+    return segments;
+  };
+  
+  // Extract phrases of n or more words from text
+  const extractPhrases = (text: string, minWords: number = 3): string[] => {
+    const phrases: string[] = [];
+    const words = text.split(/\s+/);
+    
+    // Generate phrases of increasing length
+    for (let length = minWords; length <= words.length; length++) {
+      for (let i = 0; i <= words.length - length; i++) {
+        const phrase = words.slice(i, i + length).join(' ');
+        phrases.push(phrase);
       }
-    ].filter(source => source.matchedText[0]); // Filter out sources without matched text
+    }
+    
+    return phrases;
+  };
+  
+  // Calculate similarity between two text strings
+  const calculateSimilarityScore = (text1: string, text2: string): number => {
+    // Normalize texts for comparison
+    const normalizedText1 = text1.toLowerCase().replace(/\s+/g, ' ').trim();
+    const normalizedText2 = text2.toLowerCase().replace(/\s+/g, ' ').trim();
+    
+    // If either text is empty, no similarity
+    if (!normalizedText1 || !normalizedText2) return 0;
+    
+    // Check for exact matches
+    if (normalizedText1 === normalizedText2) return 1.0;
+    
+    // Check if one text contains the other
+    if (normalizedText1.includes(normalizedText2)) {
+      return normalizedText2.length / normalizedText1.length;
+    }
+    
+    if (normalizedText2.includes(normalizedText1)) {
+      return normalizedText1.length / normalizedText2.length;
+    }
+    
+    // Calculate word overlap
+    const words1 = normalizedText1.split(' ');
+    const words2 = normalizedText2.split(' ');
+    
+    // Count matching words
+    let matchCount = 0;
+    const wordSet = new Set(words2);
+    
+    for (const word of words1) {
+      if (wordSet.has(word) && word.length > 3) { // Only count significant words
+        matchCount++;
+      }
+    }
+    
+    // Calculate Jaccard similarity coefficient
+    const uniqueWords = new Set([...words1, ...words2]);
+    const similarity = matchCount / uniqueWords.size;
+    
+    // Apply significance factor based on text lengths
+    const lengthFactor = Math.min(normalizedText1.length, normalizedText2.length) / 
+                        Math.max(normalizedText1.length, normalizedText2.length);
+    
+    // Combine factors with weights
+    const weightedSimilarity = (similarity * 0.7) + (lengthFactor * 0.3);
+    
+    return weightedSimilarity;
   };
 
   const getHighlightedText = () => {
@@ -386,12 +583,48 @@ const ResultsPage: React.FC = () => {
     
     let highlightedText = originalText;
     
-    source.matchedText.forEach(match => {
-      if (match && originalText.includes(match)) {
-        highlightedText = highlightedText.replace(
-          match,
-          `<span class="bg-accent-100 dark:bg-accent-900/50 text-accent-800 dark:text-accent-100 px-1 rounded">${match}</span>`
-        );
+    // Sort matched text segments by length (longest first) to avoid nested highlights
+    const sortedMatches = [...source.matchedText].sort((a, b) => b.length - a.length);
+    
+    // Create a map to track which parts of the text have been highlighted
+    const highlightedRanges: {start: number, end: number}[] = [];
+    
+    // Process each match
+    sortedMatches.forEach(match => {
+      if (match && match.trim().length > 10) { // Only highlight substantial matches
+        // Find all occurrences of the match in the text
+        let startIndex = 0;
+        let currentIndex: number = -1;
+        
+        while ((currentIndex = highlightedText.indexOf(match, startIndex)) !== -1) {
+          // Check if this range overlaps with any existing highlight
+          const overlaps = highlightedRanges.some(range => 
+            (currentIndex >= range.start && currentIndex < range.end) || 
+            (currentIndex + match.length > range.start && currentIndex + match.length <= range.end)
+          );
+          
+          if (!overlaps) {
+            // Calculate the parts before, during, and after the match
+            const before = highlightedText.substring(0, currentIndex);
+            const highlighted = `<span class="bg-accent-100 dark:bg-accent-900/50 text-accent-800 dark:text-accent-100 px-1 rounded">${match}</span>`;
+            const after = highlightedText.substring(currentIndex + match.length);
+            
+            // Reconstruct the text with the highlighted match
+            highlightedText = before + highlighted + after;
+            
+            // Track this highlighted range
+            highlightedRanges.push({
+              start: currentIndex,
+              end: currentIndex + highlighted.length
+            });
+            
+            // Adjust the start index for the next search
+            startIndex = currentIndex + highlighted.length;
+          } else {
+            // Skip this match and move to the next position
+            startIndex = currentIndex + 1;
+          }
+        }
       }
     });
     
@@ -412,34 +645,32 @@ const ResultsPage: React.FC = () => {
       return sentences[Math.floor(Math.random() * sentences.length)].trim();
     }
     
-    return "ethical implications of AI become increasingly important to consider";
+    return "";
   };
 
   const getAlternativeSentence = (): string => {
-    const randomSentence = getRandomSentence();
+    // Get a paraphrased version of the matched text
+    // In a real implementation, this would call an API for paraphrasing
+    const matchedText = getRandomSentence();
     
-    // Simple alternatives for demo purposes
-    const alternatives = [
-      "As this concept continues to evolve, considering its broader implications has become a crucial area of focus.",
-      "Researchers now emphasize that evaluating the consequences of this approach is an essential priority.",
-      "Experts highlight the growing significance of addressing the potential impacts in this field.",
-      "As AI continues to evolve, the ethical considerations surrounding its implementation have become a crucial focus area."
-    ];
+    if (!matchedText) {
+      return "";
+    }
     
-    return alternatives[Math.floor(Math.random() * alternatives.length)];
+    // Simple paraphrasing implementation
+    return "Paraphrased version would appear here from a real paraphrasing API.";
   };
 
   const getCitationText = (): string => {
     if (sources.length > 0) {
       const source = sources[0];
       const currentYear = new Date().getFullYear();
-      const authorLastName = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller"][Math.floor(Math.random() * 7)];
-      const authorInitial = ["A", "B", "C", "D", "E", "J", "M", "R", "S", "T"][Math.floor(Math.random() * 10)];
       
-      return `${authorLastName}, ${authorInitial}. (${currentYear}). ${source.title}. Journal of Academic Research, ${Math.floor(Math.random() * 20) + 1}(${Math.floor(Math.random() * 4) + 1}), ${Math.floor(Math.random() * 100) + 1}-${Math.floor(Math.random() * 100) + 101}.`;
+      // Use actual source information for citation
+      return `(${currentYear}). ${source.title}. Retrieved from ${source.url}`;
     }
     
-    return "Smith, J. (2023). Academic Analysis and Insights. Journal of Research, 15(2), 45-67.";
+    return "";
   };
 
   const handleRescan = () => {
@@ -866,10 +1097,18 @@ const ResultsPage: React.FC = () => {
       // For better results, take first ~150 characters as they're often most relevant
       const queryText = chunk.substring(0, 150).trim();
       
+      // Get the API keys from environment or config (double-check)
+      const apiKey = window.env?.REACT_APP_GOOGLE_API_KEY || config.apiKey;
+      const searchEngineId = window.env?.REACT_APP_GOOGLE_SEARCH_ENGINE_ID || config.searchEngineId;
+      
+      // Log the actual values being used (without exposing full keys)
+      console.log(`Using API Key: ${apiKey.substring(0, 5)}...${apiKey.substring(apiKey.length - 4)}`);
+      console.log(`Using Search Engine ID: ${searchEngineId.substring(0, 5)}...${searchEngineId.substring(searchEngineId.length - 4)}`);
+      
       // Construct the API URL with parameters
       const url = new URL('https://www.googleapis.com/customsearch/v1');
-      url.searchParams.append('key', config.apiKey);
-      url.searchParams.append('cx', config.searchEngineId);
+      url.searchParams.append('key', apiKey);
+      url.searchParams.append('cx', searchEngineId);
       url.searchParams.append('q', queryText);
       url.searchParams.append('num', String(config.maxResults || 5));
       
@@ -1075,14 +1314,6 @@ const ResultsPage: React.FC = () => {
                   >
                     Chunk Text
                   </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    icon={<Search className="w-4 h-4" />}
-                    onClick={() => setShowSearchConfig(true)}
-                  >
-                    Search Similar
-                  </Button>
                 </div>
               </div>
               
@@ -1109,49 +1340,61 @@ const ResultsPage: React.FC = () => {
               <h2 className="text-xl font-semibold text-dark-800 dark:text-dark-200 mb-4">
                 AI-Powered Suggestions
               </h2>
-              <div className="space-y-4">
-                <div className="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg p-4">
-                  <h4 className="font-medium text-dark-700 dark:text-dark-300 mb-2">
-                    Paraphrasing Suggestion
-                  </h4>
-                  <p className="text-dark-600 dark:text-dark-400 mb-3">
-                    Consider revising this highlighted sentence to make it more original:
-                  </p>
-                  <blockquote className="border-l-4 border-accent-500 pl-3 py-1 mb-3 text-dark-600 dark:text-dark-400 italic">
-                    {getRandomSentence()}
-                  </blockquote>
-                  <div className="bg-secondary-50 dark:bg-secondary-900/20 p-3 rounded-lg border border-secondary-200 dark:border-secondary-800">
-                    <p className="text-dark-700 dark:text-dark-300">
-                      Suggestion: "{getAlternativeSentence()}"
+              {sources.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg p-4">
+                    <h4 className="font-medium text-dark-700 dark:text-dark-300 mb-2">
+                      Paraphrasing Suggestion
+                    </h4>
+                    <p className="text-dark-600 dark:text-dark-400 mb-3">
+                      Consider revising this highlighted sentence to make it more original:
                     </p>
-                  </div>
-                  <div className="mt-3 flex justify-end space-x-2">
-                    <Button variant="ghost" size="sm">Ignore</Button>
-                    <Button variant="secondary" size="sm">Apply</Button>
-                  </div>
-                </div>
-                
-                <div className="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg p-4">
-                  <h4 className="font-medium text-dark-700 dark:text-dark-300 mb-2">
-                    Citation Recommendation
-                  </h4>
-                  <p className="text-dark-600 dark:text-dark-400 mb-3">
-                    Add a citation for the matched content from this source:
-                  </p>
-                  <div className="bg-primary-50 dark:bg-primary-900/20 p-3 rounded-lg border border-primary-200 dark:border-primary-800">
-                    <p className="text-dark-700 dark:text-dark-300 mb-2">
-                      Source: "{sources[0]?.title || 'Academic Source'}"
-                    </p>
-                    <div className="text-sm text-dark-500 dark:text-dark-400">
-                      {getCitationText()}
+                    <blockquote className="border-l-4 border-accent-500 pl-3 py-1 mb-3 text-dark-600 dark:text-dark-400 italic">
+                      {getRandomSentence()}
+                    </blockquote>
+                    <div className="bg-secondary-50 dark:bg-secondary-900/20 p-3 rounded-lg border border-secondary-200 dark:border-secondary-800">
+                      <p className="text-dark-700 dark:text-dark-300">
+                        Suggestion: "{getAlternativeSentence()}"
+                      </p>
+                    </div>
+                    <div className="mt-3 flex justify-end space-x-2">
+                      <Button variant="ghost" size="sm">Ignore</Button>
+                      <Button variant="secondary" size="sm">Apply</Button>
                     </div>
                   </div>
-                  <div className="mt-3 flex justify-end space-x-2">
-                    <Button variant="ghost" size="sm">Ignore</Button>
-                    <Button variant="primary" size="sm">Add Citation</Button>
+                  
+                  <div className="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg p-4">
+                    <h4 className="font-medium text-dark-700 dark:text-dark-300 mb-2">
+                      Citation Recommendation
+                    </h4>
+                    <p className="text-dark-600 dark:text-dark-400 mb-3">
+                      Add a citation for the matched content from this source:
+                    </p>
+                    <div className="bg-primary-50 dark:bg-primary-900/20 p-3 rounded-lg border border-primary-200 dark:border-primary-800">
+                      <p className="text-dark-700 dark:text-dark-300 mb-2">
+                        Source: "{sources[0]?.title}"
+                      </p>
+                      <div className="text-sm text-dark-500 dark:text-dark-400">
+                        {getCitationText()}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex justify-end space-x-2">
+                      <Button variant="ghost" size="sm">Ignore</Button>
+                      <Button variant="primary" size="sm">Add Citation</Button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg p-6 text-center">
+                  <Search className="w-12 h-12 text-dark-400 dark:text-dark-600 mx-auto mb-4" />
+                  <h4 className="font-medium text-dark-700 dark:text-dark-300 mb-2">
+                    No Matched Sources Found
+                  </h4>
+                  <p className="text-dark-500 dark:text-dark-400">
+                    No similar content was detected in our database. Your content appears to be original.
+                  </p>
+                </div>
+              )}
             </Card>
           </div>
 
@@ -1374,102 +1617,6 @@ const ResultsPage: React.FC = () => {
                 <pre className="bg-gray-100 dark:bg-dark-900 p-4 rounded-lg text-sm text-dark-800 dark:text-dark-200 overflow-auto whitespace-pre-wrap">
                   {chunkedJSON}
                 </pre>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Search Configuration Modal */}
-        {showSearchConfig && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-            <div className="bg-white dark:bg-dark-800 rounded-lg shadow-xl w-full max-w-md overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-dark-700">
-                <h3 className="text-lg font-semibold text-dark-800 dark:text-dark-200">
-                  Google Search API Configuration
-                </h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setShowSearchConfig(false)}
-                >
-                  Close
-                </Button>
-              </div>
-              <div className="p-4">
-                {configError && (
-                  <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg">
-                    {configError}
-                  </div>
-                )}
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-1">
-                      Google API Key
-                    </label>
-                    <input
-                      type="text"
-                      value={searchConfig.apiKey}
-                      onChange={handleApiKeyChange}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-dark-700 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-dark-900 dark:text-dark-200"
-                      placeholder="Enter your Google API Key"
-                    />
-                    <p className="mt-1 text-xs text-dark-500 dark:text-dark-400">
-                      Get an API key from the <a href="https://developers.google.com/custom-search/v1/overview" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Google Custom Search API</a>
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-1">
-                      Custom Search Engine ID
-                    </label>
-                    <input
-                      type="text"
-                      value={searchConfig.searchEngineId}
-                      onChange={handleSearchEngineIdChange}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-dark-700 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-dark-900 dark:text-dark-200"
-                      placeholder="Enter your Search Engine ID"
-                    />
-                    <p className="mt-1 text-xs text-dark-500 dark:text-dark-400">
-                      Create a search engine at the <a href="https://programmablesearchengine.google.com/about/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Programmable Search Engine</a>
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-dark-700 dark:text-dark-300 mb-1">
-                      Max Results Per Chunk
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={searchConfig.maxResults}
-                      onChange={handleMaxResultsChange}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-dark-700 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 dark:bg-dark-900 dark:text-dark-200"
-                      placeholder="5"
-                    />
-                    <p className="mt-1 text-xs text-dark-500 dark:text-dark-400">
-                      Maximum number of results to retrieve per chunk (1-10)
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="mt-6">
-                  <Button
-                    variant="primary"
-                    fullWidth
-                    icon={<Search className="w-4 h-4" />}
-                    onClick={handleSearchSimilarContent}
-                    disabled={isSearching}
-                  >
-                    {isSearching ? 'Searching...' : 'Search for Similar Content'}
-                  </Button>
-                  
-                  <p className="mt-4 text-xs text-dark-500 dark:text-dark-400 text-center">
-                    Note: Google API has a quota limit of 100 queries per day for free accounts. 
-                    Searches will be rate-limited to respect API quotas.
-                  </p>
-                </div>
               </div>
             </div>
           </div>
