@@ -14,6 +14,7 @@ from django.db.models import Count
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models.functions import TruncMonth
+from django.db import models
 
 # Create your views here.
 
@@ -33,8 +34,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
         Override create method to handle file upload without saving to disk.
         Process the file in memory and only store the extracted text.
         """
-        print(f"Document upload started by user: {request.user.username}")  # Debug log
-        
         # Get the uploaded file
         uploaded_file = request.FILES.get('file')
         title = request.data.get('title', '')
@@ -44,8 +43,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
         
         if not title:
             title = uploaded_file.name
-            
-        print(f"Processing file: {title}")  # Debug log
         
         # Determine file type from extension
         file_name = uploaded_file.name.lower()
@@ -64,21 +61,21 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Calculate originality score (implement your plagiarism detection logic here)
+        originality_score = self.calculate_originality_score(extracted_text)
+        
         # Create document object without saving the file
         document_data = {
             'title': title,
             'file_type': file_type,
             'extracted_text': extracted_text,
             'original_filename': uploaded_file.name,
-            'uploaded_by': request.user  # Always set the logged-in user
+            'uploaded_by': request.user,
+            'originality_score': originality_score
         }
-        
-        print(f"Creating document with data: {document_data}")  # Debug log
         
         # Create document in database
         document = Document.objects.create(**document_data)
-        
-        print(f"Document created successfully with ID: {document.id}")  # Debug log
         
         # Serialize and return the document
         serializer = self.get_serializer(document)
@@ -141,24 +138,29 @@ class DocumentViewSet(viewsets.ModelViewSet):
         response['Content-Disposition'] = f'attachment; filename="{document.title}_extracted.txt"'
         return response
 
+    def calculate_originality_score(self, text):
+        """
+        Calculate originality score for the given text.
+        This is a placeholder implementation - you should replace this with your actual
+        plagiarism detection logic.
+        """
+        # For now, return a random score between 70 and 100 as an example
+        import random
+        return random.uniform(70, 100)
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_dashboard_data(request):
-    print("Dashboard API called by user:", request.user.username)  # Debug log
-    
     # Get user's documents
     user_documents = Document.objects.filter(uploaded_by=request.user)
-    print("Total documents found:", user_documents.count())  # Debug log
     
     # Get recent documents
     recent_documents = user_documents.order_by('-uploaded_at')[:4]
-    print("Recent documents:", [doc.title for doc in recent_documents])  # Debug log
-    
     recent_docs_data = [{
         'id': doc.id,
         'name': doc.title,
         'date': doc.uploaded_at.strftime('%Y-%m-%d'),
-        'score': 85  # This would come from your plagiarism check results
+        'score': doc.originality_score  # Use the actual originality score
     } for doc in recent_documents]
     
     # Calculate total documents
@@ -167,7 +169,6 @@ def get_dashboard_data(request):
     # Calculate monthly trend
     last_month = timezone.now() - timedelta(days=30)
     recent_scans = user_documents.filter(uploaded_at__gte=last_month).count()
-    print("Recent scans (last 30 days):", recent_scans)  # Debug log
     
     # Calculate month-over-month change
     previous_month = last_month - timedelta(days=30)
@@ -178,17 +179,17 @@ def get_dashboard_data(request):
     
     scan_change = ((recent_scans - previous_month_scans) / max(previous_month_scans, 1)) * 100 if previous_month_scans else 0
     
-    # Get average originality score (this would come from your plagiarism check results)
-    avg_originality = 87  # Placeholder - implement based on your scoring system
+    # Calculate real average originality score
+    avg_originality = user_documents.aggregate(
+        avg_score=models.Avg('originality_score')
+    )['avg_score'] or 100.0  # Default to 100 if no documents exist
     
-    response_data = {
+    return Response({
         'recentDocuments': recent_docs_data,
         'stats': {
             'totalDocuments': total_documents,
             'recentScans': recent_scans,
             'scanChange': scan_change,
-            'avgOriginality': avg_originality
+            'avgOriginality': round(avg_originality, 1)  # Round to 1 decimal place
         }
-    }
-    print("Sending response data:", response_data)  # Debug log
-    return Response(response_data)
+    })
