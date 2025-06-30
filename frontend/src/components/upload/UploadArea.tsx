@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Upload, X, FileText, Check, AlertCircle } from 'lucide-react';
 import Button from '../ui/Button';
+import { useAuth } from '../../context/AuthContext';
 
 interface UploadAreaProps {
   onFileSelected: (file: File) => void;
@@ -9,6 +10,7 @@ interface UploadAreaProps {
 }
 
 const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted }) => {
+  const { token } = useAuth();
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -64,9 +66,9 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
       const response = await fetch('http://localhost:8000/api/documents/', {
         method: 'POST',
         body: formData,
-        credentials: 'include',
         headers: {
           'Accept': 'application/json',
+          'Authorization': `Token ${token}`,
         }
       });
       
@@ -91,9 +93,9 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
         setUploadProgress(95);
         // If for some reason the extracted text isn't in the response, fetch it
         const textResponse = await fetch(`http://localhost:8000/api/documents/${data.id}/extracted_text/`, {
-          credentials: 'include',
           headers: {
             'Accept': 'application/json',
+            'Authorization': `Token ${token}`,
           }
         });
         

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Upload, 
@@ -16,14 +16,66 @@ import {
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+
+interface DashboardData {
+  recentDocuments: {
+    id: number;
+    name: string;
+    date: string;
+    score: number;
+  }[];
+  stats: {
+    totalDocuments: number;
+    recentScans: number;
+    scanChange: number;
+    avgOriginality: number;
+  };
+}
 
 const DashboardPage: React.FC = () => {
-  const recentDocuments = [
-    { id: 1, name: 'Research Paper.pdf', date: '2023-05-15', score: 92 },
-    { id: 2, name: 'Academic Essay.docx', date: '2023-05-10', score: 85 },
-    { id: 3, name: 'Project Proposal.pdf', date: '2023-05-05', score: 97 },
-    { id: 4, name: 'Literature Review.docx', date: '2023-04-28', score: 78 },
-  ];
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { token } = useAuth();
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const response = await axios.get('/api/documents/dashboard/', {
+          headers: {
+            'Authorization': `Token ${token}`
+          }
+        });
+        setDashboardData(response.data);
+        setError(null);
+      } catch (err) {
+        setError('Failed to load dashboard data');
+        console.error('Error fetching dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [token]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="py-16 px-4">
@@ -76,13 +128,9 @@ const DashboardPage: React.FC = () => {
                   <span className="text-sm font-medium text-dark-500 dark:text-dark-400">All time</span>
                 </div>
                 <h3 className="text-2xl font-bold text-dark-900 dark:text-dark-100 mb-1">
-                  48
+                  {dashboardData?.stats.totalDocuments || 0}
                 </h3>
                 <p className="text-dark-600 dark:text-dark-400 text-sm">Total Documents</p>
-                <div className="mt-4 flex items-center text-green-500 text-sm">
-                  <ArrowUpRight className="w-4 h-4 mr-1" />
-                  <span>12% from last month</span>
-                </div>
               </Card>
             </motion.div>
             
@@ -99,13 +147,9 @@ const DashboardPage: React.FC = () => {
                   <span className="text-sm font-medium text-dark-500 dark:text-dark-400">Average</span>
                 </div>
                 <h3 className="text-2xl font-bold text-dark-900 dark:text-dark-100 mb-1">
-                  87%
+                  {dashboardData?.stats.avgOriginality || 0}%
                 </h3>
                 <p className="text-dark-600 dark:text-dark-400 text-sm">Originality Score</p>
-                <div className="mt-4 flex items-center text-green-500 text-sm">
-                  <ArrowUpRight className="w-4 h-4 mr-1" />
-                  <span>5% from last month</span>
-                </div>
               </Card>
             </motion.div>
             
@@ -122,12 +166,16 @@ const DashboardPage: React.FC = () => {
                   <span className="text-sm font-medium text-dark-500 dark:text-dark-400">Past 30 days</span>
                 </div>
                 <h3 className="text-2xl font-bold text-dark-900 dark:text-dark-100 mb-1">
-                  12
+                  {dashboardData?.stats.recentScans || 0}
                 </h3>
                 <p className="text-dark-600 dark:text-dark-400 text-sm">Recent Scans</p>
-                <div className="mt-4 flex items-center text-red-500 text-sm">
-                  <ArrowDownRight className="w-4 h-4 mr-1" />
-                  <span>3% from last month</span>
+                <div className={`mt-4 flex items-center ${dashboardData?.stats.scanChange >= 0 ? 'text-green-500' : 'text-red-500'} text-sm`}>
+                  {dashboardData?.stats.scanChange >= 0 ? (
+                    <ArrowUpRight className="w-4 h-4 mr-1" />
+                  ) : (
+                    <ArrowDownRight className="w-4 h-4 mr-1" />
+                  )}
+                  <span>{Math.abs(Math.round(dashboardData?.stats.scanChange || 0))}% from last month</span>
                 </div>
               </Card>
             </motion.div>
@@ -185,7 +233,7 @@ const DashboardPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {recentDocuments.map(doc => (
+                      {dashboardData?.recentDocuments.map(doc => (
                         <tr 
                           key={doc.id} 
                           className="border-b border-gray-100 dark:border-dark-800 hover:bg-gray-50 dark:hover:bg-dark-800/50 transition-colors"

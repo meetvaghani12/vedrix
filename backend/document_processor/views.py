@@ -2,7 +2,7 @@ from django.shortcuts import render
 import os
 from io import BytesIO
 from rest_framework import viewsets, status
-from rest_framework.decorators import action, api_view, parser_classes
+from rest_framework.decorators import action, api_view, parser_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -10,6 +10,10 @@ from django.http import HttpResponse
 from .models import Document
 from .serializers import DocumentSerializer, DocumentTextSerializer
 from .utils import extract_text_from_pdf, extract_text_from_docx, extract_text_from_doc
+from django.db.models import Count
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models.functions import TruncMonth
 
 # Create your views here.
 
@@ -17,20 +21,20 @@ class DocumentViewSet(viewsets.ModelViewSet):
     """ViewSet for handling document operations."""
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
-    permission_classes = [AllowAny]  # Allow any user for testing
+    permission_classes = [IsAuthenticated]  # Change to require authentication
     parser_classes = [MultiPartParser, FormParser]
     
     def get_queryset(self):
         """Filter documents to only show those uploaded by the current user."""
-        if self.request.user.is_authenticated:
-            return Document.objects.filter(uploaded_by=self.request.user)
-        return Document.objects.all()  # For testing purposes
+        return Document.objects.filter(uploaded_by=self.request.user)
     
     def create(self, request, *args, **kwargs):
         """
         Override create method to handle file upload without saving to disk.
         Process the file in memory and only store the extracted text.
         """
+        print(f"Document upload started by user: {request.user.username}")  # Debug log
+        
         # Get the uploaded file
         uploaded_file = request.FILES.get('file')
         title = request.data.get('title', '')
@@ -40,6 +44,8 @@ class DocumentViewSet(viewsets.ModelViewSet):
         
         if not title:
             title = uploaded_file.name
+            
+        print(f"Processing file: {title}")  # Debug log
         
         # Determine file type from extension
         file_name = uploaded_file.name.lower()
@@ -64,13 +70,15 @@ class DocumentViewSet(viewsets.ModelViewSet):
             'file_type': file_type,
             'extracted_text': extracted_text,
             'original_filename': uploaded_file.name,
+            'uploaded_by': request.user  # Always set the logged-in user
         }
         
-        if request.user.is_authenticated:
-            document_data['uploaded_by'] = request.user
+        print(f"Creating document with data: {document_data}")  # Debug log
         
         # Create document in database
         document = Document.objects.create(**document_data)
+        
+        print(f"Document created successfully with ID: {document.id}")  # Debug log
         
         # Serialize and return the document
         serializer = self.get_serializer(document)
@@ -132,3 +140,55 @@ class DocumentViewSet(viewsets.ModelViewSet):
         response = HttpResponse(document.extracted_text, content_type='text/plain')
         response['Content-Disposition'] = f'attachment; filename="{document.title}_extracted.txt"'
         return response
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_dashboard_data(request):
+    print("Dashboard API called by user:", request.user.username)  # Debug log
+    
+    # Get user's documents
+    user_documents = Document.objects.filter(uploaded_by=request.user)
+    print("Total documents found:", user_documents.count())  # Debug log
+    
+    # Get recent documents
+    recent_documents = user_documents.order_by('-uploaded_at')[:4]
+    print("Recent documents:", [doc.title for doc in recent_documents])  # Debug log
+    
+    recent_docs_data = [{
+        'id': doc.id,
+        'name': doc.title,
+        'date': doc.uploaded_at.strftime('%Y-%m-%d'),
+        'score': 85  # This would come from your plagiarism check results
+    } for doc in recent_documents]
+    
+    # Calculate total documents
+    total_documents = user_documents.count()
+    
+    # Calculate monthly trend
+    last_month = timezone.now() - timedelta(days=30)
+    recent_scans = user_documents.filter(uploaded_at__gte=last_month).count()
+    print("Recent scans (last 30 days):", recent_scans)  # Debug log
+    
+    # Calculate month-over-month change
+    previous_month = last_month - timedelta(days=30)
+    previous_month_scans = user_documents.filter(
+        uploaded_at__gte=previous_month,
+        uploaded_at__lt=last_month
+    ).count()
+    
+    scan_change = ((recent_scans - previous_month_scans) / max(previous_month_scans, 1)) * 100 if previous_month_scans else 0
+    
+    # Get average originality score (this would come from your plagiarism check results)
+    avg_originality = 87  # Placeholder - implement based on your scoring system
+    
+    response_data = {
+        'recentDocuments': recent_docs_data,
+        'stats': {
+            'totalDocuments': total_documents,
+            'recentScans': recent_scans,
+            'scanChange': scan_change,
+            'avgOriginality': avg_originality
+        }
+    }
+    print("Sending response data:", response_data)  # Debug log
+    return Response(response_data)
