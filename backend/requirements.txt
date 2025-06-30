@@ -8,3 +8,5 @@ PyPDF2>=3.0.1  # For PDF text extraction
 python-docx>=1.1.2  # For DOCX text extraction
 drf-yasg[validation]==1.21.10  # For Swagger/OpenAPI docs
 reportlab>=4.1.0  # For PDF report generation
+coreapi>=2.3.3  # For API schema support
+gunicorn>=21.2.0  # For production server

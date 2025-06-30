@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: vedrix
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && python manage.py migrate && gunicorn turnitin_backend.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+      - key: PORT
+        value: 8000 
