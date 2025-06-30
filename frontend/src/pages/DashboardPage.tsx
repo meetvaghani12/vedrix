@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import axios from 'axios';
+import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 
 interface DashboardData {
@@ -43,7 +43,7 @@ const DashboardPage: React.FC = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const response = await axios.get('/api/documents/dashboard/', {
+        const response = await api.get('/api/documents/dashboard/', {
           headers: {
             'Authorization': `Token ${token}`
           }
@@ -169,14 +169,16 @@ const DashboardPage: React.FC = () => {
                   {dashboardData?.stats.recentScans || 0}
                 </h3>
                 <p className="text-dark-600 dark:text-dark-400 text-sm">Recent Scans</p>
-                <div className={`mt-4 flex items-center ${dashboardData?.stats.scanChange >= 0 ? 'text-green-500' : 'text-red-500'} text-sm`}>
-                  {dashboardData?.stats.scanChange >= 0 ? (
-                    <ArrowUpRight className="w-4 h-4 mr-1" />
-                  ) : (
-                    <ArrowDownRight className="w-4 h-4 mr-1" />
-                  )}
-                  <span>{Math.abs(Math.round(dashboardData?.stats.scanChange || 0))}% from last month</span>
-                </div>
+                {dashboardData?.stats.scanChange !== undefined && (
+                  <div className={`mt-4 flex items-center ${dashboardData.stats.scanChange >= 0 ? 'text-green-500' : 'text-red-500'} text-sm`}>
+                    {dashboardData.stats.scanChange >= 0 ? (
+                      <ArrowUpRight className="w-4 h-4 mr-1" />
+                    ) : (
+                      <ArrowDownRight className="w-4 h-4 mr-1" />
+                    )}
+                    <span>{Math.abs(Math.round(dashboardData.stats.scanChange))}% from last month</span>
+                  </div>
+                )}
               </Card>
             </motion.div>
             
