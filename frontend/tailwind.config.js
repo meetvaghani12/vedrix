@@ -5,8 +5,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sora: ['Sora', 'sans-serif'],
-        inter: ['Inter', 'sans-serif'],
+        sans: ['Outfit', 'sans-serif'],
+        outfit: ['Outfit', 'sans-serif'],
       },
       colors: {
         // Primary colors
