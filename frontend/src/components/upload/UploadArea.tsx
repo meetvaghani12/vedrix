@@ -81,6 +81,11 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
       setUploadProgress(95);
       const data = await response.json();
       
+      // Store document ID in session storage
+      if (data.id) {
+        sessionStorage.setItem('documentId', data.id.toString());
+      }
+      
       // The extracted text is now included in the response
       if (data.extracted_text) {
         setUploadProgress(100);

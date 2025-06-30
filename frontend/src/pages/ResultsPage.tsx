@@ -279,6 +279,67 @@ interface ChunkSearchResults {
   error?: string;
 }
 
+// Add this function after the imports and before the component
+const updateScoreInDatabase = async (score: number) => {
+  const documentId = sessionStorage.getItem('documentId');
+  const token = localStorage.getItem('token'); // Changed from 'authToken' to 'token'
+  
+  if (!documentId) {
+    console.error('No document ID found in session storage');
+    return;
+  }
+
+  if (!token) {
+    console.error('No auth token found');
+    return;
+  }
+
+  console.log('Attempting to update score:', {
+    documentId,
+    score,
+    hasToken: !!token,
+    url: `http://localhost:8000/api/documents/${documentId}/update_originality_score/`
+  });
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Token ${token}`,
+  };
+
+  console.log('Request headers:', headers);
+
+  try {
+    const response = await fetch(`http://localhost:8000/api/documents/${documentId}/update_originality_score/`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        score: score
+      })
+    });
+
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+    
+    const data = await response.json();
+    console.log('Response data:', data);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to update score: ${response.status} - ${JSON.stringify(data)}`);
+    }
+
+    console.log('Score updated successfully:', data);
+  } catch (error) {
+    console.error('Error updating originality score:', error);
+    // Log the full error details
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack
+      });
+    }
+  }
+};
+
 const ResultsPage: React.FC = () => {
   const navigate = useNavigate();
   const [originalText, setOriginalText] = useState<string>('');
@@ -416,13 +477,32 @@ const ResultsPage: React.FC = () => {
         setSources(sources);
         
         // Calculate overall plagiarism score based on total matched text
+        const totalTextLength = originalText.length;
+        let totalMatchedLength = 0;
+        
+        results.forEach(chunkResult => {
+          chunkResult.results.forEach(result => {
+            // Calculate similarity score using text comparison algorithms
+            const matchScore = calculateSimilarityScore(chunkResult.chunkText, result.snippet);
+            
+            // Calculate match percentage based on chunk length and match score
+            const chunkLength = chunkResult.chunkText.length;
+            const effectiveMatchLength = chunkLength * matchScore;
+            totalMatchedLength += effectiveMatchLength;
+          });
+        });
+        
         const overallMatchPercentage = Math.min(100, Math.round((totalMatchedLength / totalTextLength) * 100));
         
         // Originality score is inverse of match percentage
         const newScore = 100 - overallMatchPercentage;
         
         // Apply score with minimum threshold
-        setOverallScore(Math.max(newScore, 5));
+        const finalScore = Math.max(newScore, 5);
+        setOverallScore(finalScore);
+        
+        // Update score in database
+        await updateScoreInDatabase(finalScore);
         
         console.log(`Calculated plagiarism score: ${overallMatchPercentage}%, originality: ${newScore}%`);
       }
@@ -436,7 +516,7 @@ const ResultsPage: React.FC = () => {
   };
 
   // Update sources based on search results
-  const updateSourcesFromSearchResults = (results: ChunkSearchResults[]) => {
+  const updateSourcesFromSearchResults = async (results: ChunkSearchResults[]) => {
     // Create new sources from search results
     const newSources: Source[] = [];
     let sourceId = 1;
@@ -498,7 +578,11 @@ const ResultsPage: React.FC = () => {
       const newScore = 100 - overallMatchPercentage;
       
       // Apply score with minimum threshold
-      setOverallScore(Math.max(newScore, 5));
+      const finalScore = Math.max(newScore, 5);
+      setOverallScore(finalScore);
+      
+      // Update score in database
+      await updateScoreInDatabase(finalScore);
       
       console.log(`Calculated plagiarism score: ${overallMatchPercentage}%, originality: ${newScore}%`);
     }

@@ -5,7 +5,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, parser_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.http import HttpResponse
 from .models import Document
 from .serializers import DocumentSerializer, DocumentTextSerializer
@@ -23,7 +23,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
     queryset = Document.objects.all()
     serializer_class = DocumentSerializer
     permission_classes = [IsAuthenticated]  # Change to require authentication
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     def get_queryset(self):
         """Filter documents to only show those uploaded by the current user."""
@@ -61,9 +61,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Calculate originality score (implement your plagiarism detection logic here)
-        originality_score = self.calculate_originality_score(extracted_text)
-        
         # Create document object without saving the file
         document_data = {
             'title': title,
@@ -71,16 +68,17 @@ class DocumentViewSet(viewsets.ModelViewSet):
             'extracted_text': extracted_text,
             'original_filename': uploaded_file.name,
             'uploaded_by': request.user,
-            'originality_score': originality_score
         }
         
         # Create document in database
         document = Document.objects.create(**document_data)
         
-        # Serialize and return the document
-        serializer = self.get_serializer(document)
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        return Response({
+            'id': document.id,
+            'title': document.title,
+            'extracted_text': document.extracted_text,
+            'message': 'Document uploaded and processed successfully'
+        }, status=status.HTTP_201_CREATED)
     
     def process_pdf_in_memory(self, file):
         """Process PDF file in memory without saving to disk."""
@@ -138,15 +136,35 @@ class DocumentViewSet(viewsets.ModelViewSet):
         response['Content-Disposition'] = f'attachment; filename="{document.title}_extracted.txt"'
         return response
 
-    def calculate_originality_score(self, text):
-        """
-        Calculate originality score for the given text.
-        This is a placeholder implementation - you should replace this with your actual
-        plagiarism detection logic.
-        """
-        # For now, return a random score between 70 and 100 as an example
-        import random
-        return random.uniform(70, 100)
+    @action(detail=True, methods=['post'])
+    def update_originality_score(self, request, pk=None):
+        """Update the originality score for a document after frontend analysis."""
+        document = self.get_object()
+        score = request.data.get('score')
+        
+        if score is None:
+            return Response(
+                {"error": "Score is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            score = float(score)
+            if not (0 <= score <= 100):
+                raise ValueError("Score must be between 0 and 100")
+        except ValueError as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        document.originality_score = score
+        document.save()
+        
+        return Response({
+            "message": "Score updated successfully",
+            "score": score
+        })
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

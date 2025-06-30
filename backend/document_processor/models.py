@@ -15,7 +15,7 @@ class Document(models.Model):
     extracted_text = models.TextField(blank=True)
     uploaded_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents', null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
-    originality_score = models.FloatField(default=100.0)  # Store as percentage, default 100% original
+    originality_score = models.FloatField(null=True, blank=True)  # Allow null until real score is calculated
     
     def __str__(self):
         return self.title
