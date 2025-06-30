@@ -1,12 +1,13 @@
 from django.shortcuts import render
 import os
 from io import BytesIO
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action, api_view, parser_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.http import HttpResponse
+from django.db.models import Q
 from .models import Document
 from .serializers import DocumentSerializer, DocumentTextSerializer
 from .utils import extract_text_from_pdf, extract_text_from_docx, extract_text_from_doc
@@ -15,6 +16,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db.models.functions import TruncMonth
 from django.db import models
+from django.core.paginator import Paginator
 
 # Create your views here.
 
@@ -27,7 +29,67 @@ class DocumentViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filter documents to only show those uploaded by the current user."""
-        return Document.objects.filter(uploaded_by=self.request.user)
+        queryset = Document.objects.filter(uploaded_by=self.request.user)
+        
+        # Get query parameters
+        search = self.request.query_params.get('search', '')
+        sort = self.request.query_params.get('sort', 'date')
+        order = self.request.query_params.get('order', 'desc')
+        score_filter = self.request.query_params.get('score', 'all')
+        
+        # Apply search filter
+        if search:
+            queryset = queryset.filter(
+                Q(title__icontains=search) |
+                Q(original_filename__icontains=search)
+            )
+        
+        # Apply score filter
+        if score_filter == 'high':
+            queryset = queryset.filter(originality_score__gte=80)
+        elif score_filter == 'medium':
+            queryset = queryset.filter(originality_score__gte=50, originality_score__lt=80)
+        elif score_filter == 'low':
+            queryset = queryset.filter(originality_score__lt=50)
+        
+        # Apply sorting
+        sort_field = {
+            'date': '-uploaded_at',
+            'title': 'title',
+            'score': '-originality_score'
+        }.get(sort, '-uploaded_at')
+        
+        if order == 'asc' and sort_field.startswith('-'):
+            sort_field = sort_field[1:]
+        elif order == 'desc' and not sort_field.startswith('-'):
+            sort_field = f'-{sort_field}'
+        
+        return queryset.order_by(sort_field)
+    
+    def list(self, request, *args, **kwargs):
+        """Override list method to add pagination."""
+        queryset = self.get_queryset()
+        page = request.query_params.get('page', 1)
+        try:
+            page = int(page)
+        except ValueError:
+            page = 1
+        
+        paginator = Paginator(queryset, 10)  # Show 10 documents per page
+        total_pages = paginator.num_pages
+        
+        try:
+            documents = paginator.page(page)
+        except:
+            documents = paginator.page(1)
+        
+        serializer = self.get_serializer(documents, many=True)
+        
+        return Response({
+            'documents': serializer.data,
+            'total': paginator.count,
+            'totalPages': total_pages
+        })
     
     def create(self, request, *args, **kwargs):
         """
@@ -165,6 +227,134 @@ class DocumentViewSet(viewsets.ModelViewSet):
             "message": "Score updated successfully",
             "score": score
         })
+
+    @action(detail=True, methods=['get'])
+    def download(self, request, pk=None):
+        """Generate and download a PDF report for the document."""
+        document = self.get_object()
+        
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import letter
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+            
+            # Create a BytesIO buffer to receive PDF data
+            buffer = BytesIO()
+            
+            # Create the PDF object using the buffer as its "file"
+            doc = SimpleDocTemplate(buffer, pagesize=letter)
+            
+            # Container for the 'Flowable' objects
+            elements = []
+            
+            # Get styles
+            styles = getSampleStyleSheet()
+            title_style = styles['Heading1']
+            normal_style = styles['Normal']
+            
+            # Add title
+            elements.append(Paragraph(f"Plagiarism Report: {document.title}", title_style))
+            elements.append(Spacer(1, 12))
+            
+            # Add document info
+            info_data = [
+                ['Document Name:', document.title],
+                ['Original Filename:', document.original_filename],
+                ['File Type:', document.file_type.upper()],
+                ['Upload Date:', document.uploaded_at.strftime('%Y-%m-%d %H:%M:%S')],
+                ['Originality Score:', f"{document.originality_score:.1f}%"]
+            ]
+            
+            # Create table for document info
+            info_table = Table(info_data, colWidths=[2*inch, 4*inch])
+            info_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('BACKGROUND', (0, -1), (0, -1), colors.HexColor('#ffcccc' if document.originality_score < 50 else '#ccffcc')),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            elements.append(info_table)
+            elements.append(Spacer(1, 20))
+            
+            # Add extracted text section
+            elements.append(Paragraph("Extracted Text:", styles['Heading2']))
+            elements.append(Spacer(1, 12))
+            
+            # Split text into paragraphs and add them
+            text_paragraphs = document.extracted_text.split('\n\n')
+            for para in text_paragraphs:
+                if para.strip():
+                    elements.append(Paragraph(para, normal_style))
+                    elements.append(Spacer(1, 12))
+            
+            # Build the PDF
+            doc.build(elements)
+            
+            # Get the value of the BytesIO buffer
+            pdf = buffer.getvalue()
+            buffer.close()
+            
+            # Create the HttpResponse object with PDF headers
+            response = HttpResponse(content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{document.title}_report.pdf"'
+            response.write(pdf)
+            
+            return response
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error generating PDF report: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['get'])
+    def analytics(self, request, pk=None):
+        """Get analytics data for a document."""
+        document = self.get_object()
+        
+        try:
+            # Calculate analytics data
+            total_words = len(document.extracted_text.split())
+            sentences = document.extracted_text.split('.')
+            total_sentences = len([s for s in sentences if s.strip()])
+            
+            # Get originality score
+            originality_score = document.originality_score or 0
+            
+            # Calculate readability metrics (example using a simple formula)
+            avg_words_per_sentence = total_words / max(total_sentences, 1)
+            
+            return Response({
+                'documentInfo': {
+                    'id': document.id,
+                    'title': document.title,
+                    'uploadDate': document.uploaded_at,
+                    'fileType': document.file_type,
+                    'originalFilename': document.original_filename
+                },
+                'textAnalysis': {
+                    'totalWords': total_words,
+                    'totalSentences': total_sentences,
+                    'avgWordsPerSentence': round(avg_words_per_sentence, 1)
+                },
+                'plagiarismAnalysis': {
+                    'originalityScore': originality_score,
+                    'similarityScore': 100 - originality_score,
+                    'riskLevel': 'High' if originality_score < 50 else 'Medium' if originality_score < 80 else 'Low'
+                }
+            })
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error generating analytics: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

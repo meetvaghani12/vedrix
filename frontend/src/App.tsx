@@ -12,6 +12,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import OTPVerificationPage from './pages/OTPVerificationPage';
 import SettingsPage from './pages/SettingsPage';
+import DocumentsPage from './pages/DocumentsPage';
+import DocumentAnalyticsPage from './pages/DocumentAnalyticsPage';
 import BackgroundParticles from './components/ui/BackgroundParticles';
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
@@ -91,8 +93,10 @@ function App() {
           {/* Protected routes */}
           <Route element={<ProtectedRoute />}>
             <Route path="upload" element={<UploadPage />} />
-            <Route path="results" element={<ResultsPage />} />
+            <Route path="results/:id" element={<ResultsPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="documents" element={<DocumentsPage />} />
+            <Route path="analytics/:id" element={<DocumentAnalyticsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           
