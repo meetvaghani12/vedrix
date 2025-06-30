@@ -298,7 +298,7 @@ const updateScoreInDatabase = async (score: number) => {
   };
 
   try {
-    const response = await fetch(`http://localhost:8000/api/documents/${documentId}/update_originality_score/`, {
+    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/documents/${documentId}/update_originality_score/`, {
       method: 'POST',
       headers,
       body: JSON.stringify({

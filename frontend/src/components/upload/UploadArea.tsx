@@ -63,7 +63,7 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
         });
       }, 500);
       
-      const response = await fetch('http://localhost:8000/api/documents/', {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/documents/`, {
         method: 'POST',
         body: formData,
         headers: {
@@ -97,7 +97,7 @@ const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelected, onTextExtracted
       } else {
         setUploadProgress(95);
         // If for some reason the extracted text isn't in the response, fetch it
-        const textResponse = await fetch(`http://localhost:8000/api/documents/${data.id}/extracted_text/`, {
+        const textResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/documents/${data.id}/extracted_text/`, {
           headers: {
             'Accept': 'application/json',
             'Authorization': `Token ${token}`,
