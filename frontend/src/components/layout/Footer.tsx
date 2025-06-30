@@ -41,7 +41,7 @@ const Footer: React.FC = () => {
               Product
             </h3>
             <ul className="space-y-2">
-              {['Features', 'Pricing', 'Case Studies', 'Reviews', 'Updates'].map((item) => (
+              {['Features', , 'Case Studies', 'Reviews', 'Updates'].map((item) => (
                 <li key={item}>
                   <Link to="#" className="text-dark-600 dark:text-dark-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors">
                     {item}
