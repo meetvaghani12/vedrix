@@ -14,15 +14,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Check for stored theme preference
     const savedTheme = localStorage.getItem('theme');
     
-    // Check for system preference
+    // If no saved theme, return dark by default
     if (!savedTheme) {
-      const systemPreference = window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light';
-      return systemPreference;
+      return 'dark';
     }
     
-    return (savedTheme as Theme) || 'light';
+    return (savedTheme as Theme);
   });
 
   useEffect(() => {
