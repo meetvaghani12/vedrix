@@ -37,8 +37,8 @@ interface RegisterData {
 // Create the auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// API URL - using the Vite proxy which forwards to Django
-const API_URL = '/api';
+// API URL - using environment variable or fallback to proxy
+const API_URL = import.meta.env.VITE_BACKEND_URL ? `${import.meta.env.VITE_BACKEND_URL}/api` : '/api';
 
 interface AuthProviderProps {
   children: ReactNode;
