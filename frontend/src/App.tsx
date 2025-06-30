@@ -61,7 +61,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 dark:from-dark-900 dark:to-dark-950 transition-colors duration-300 ease-in-out">
+    <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 dark:from-dark-950 dark:to-black transition-colors duration-300 ease-in-out">
       <BackgroundParticles />
       <Routes>
         {/* Mode Selection Route */}
