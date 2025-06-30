@@ -23,6 +23,7 @@ import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
 import AdminLogsPage from './pages/admin/AdminLogsPage';
 import AdminSettingsPage from './pages/admin/AdminSettingsPage';
 import ModeSelectionPage from './pages/ModeSelectionPage';
+import About from './pages/about';
 
 function App() {
   const { loading, user, isAuthenticated } = useAuth();
@@ -83,6 +84,7 @@ function App() {
         {/* Public and User Routes */}
         <Route path="/" element={<Layout />}>
           <Route index element={<HomePage />} />
+          <Route path="about" element={<About />} />
           <Route path="contact" element={<ContactPage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />

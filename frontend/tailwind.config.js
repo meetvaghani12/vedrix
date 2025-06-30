@@ -7,6 +7,7 @@ export default {
       fontFamily: {
         sora: ['Sora', 'sans-serif'],
         inter: ['Inter', 'sans-serif'],
+        outfit: ['Outfit', 'sans-serif'],
       },
       colors: {
         // Primary colors
