@@ -56,14 +56,14 @@ function App() {
   if (loading) {
     // Show a simple loading spinner while authentication state is being determined
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-black">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 dark:from-dark-900 dark:to-dark-950 transition-colors duration-300 ease-in-out">
+    <div className="min-h-screen bg-black text-gray-300 font-outfit">
       <BackgroundParticles />
       <Routes>
         {/* Mode Selection Route */}

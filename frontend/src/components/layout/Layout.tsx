@@ -10,7 +10,7 @@ const Layout: React.FC = () => {
   const isHomePage = location.pathname === '/';
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-black text-gray-300 font-outfit">
       {isHomePage && <Navbar />}
       {!isHomePage && <BackButton />}
       <main className="flex-grow">
