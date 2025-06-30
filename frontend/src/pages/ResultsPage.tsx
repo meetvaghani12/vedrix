@@ -282,31 +282,20 @@ interface ChunkSearchResults {
 // Add this function after the imports and before the component
 const updateScoreInDatabase = async (score: number) => {
   const documentId = sessionStorage.getItem('documentId');
-  const token = localStorage.getItem('token'); // Changed from 'authToken' to 'token'
+  const token = localStorage.getItem('token');
   
   if (!documentId) {
-    console.error('No document ID found in session storage');
     return;
   }
 
   if (!token) {
-    console.error('No auth token found');
     return;
   }
-
-  console.log('Attempting to update score:', {
-    documentId,
-    score,
-    hasToken: !!token,
-    url: `http://localhost:8000/api/documents/${documentId}/update_originality_score/`
-  });
 
   const headers = {
     'Content-Type': 'application/json',
     'Authorization': `Token ${token}`,
   };
-
-  console.log('Request headers:', headers);
 
   try {
     const response = await fetch(`http://localhost:8000/api/documents/${documentId}/update_originality_score/`, {
@@ -316,27 +305,14 @@ const updateScoreInDatabase = async (score: number) => {
         score: score
       })
     });
-
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
     
     const data = await response.json();
-    console.log('Response data:', data);
     
     if (!response.ok) {
-      throw new Error(`Failed to update score: ${response.status} - ${JSON.stringify(data)}`);
+      throw new Error(`Failed to update score: ${response.status}`);
     }
-
-    console.log('Score updated successfully:', data);
   } catch (error) {
-    console.error('Error updating originality score:', error);
-    // Log the full error details
-    if (error instanceof Error) {
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack
-      });
-    }
+    // Silently handle errors
   }
 };
 
@@ -503,8 +479,6 @@ const ResultsPage: React.FC = () => {
         
         // Update score in database
         await updateScoreInDatabase(finalScore);
-        
-        console.log(`Calculated plagiarism score: ${overallMatchPercentage}%, originality: ${newScore}%`);
       }
     } catch (error) {
       console.error('Error performing similarity search:', error);
@@ -583,8 +557,6 @@ const ResultsPage: React.FC = () => {
       
       // Update score in database
       await updateScoreInDatabase(finalScore);
-      
-      console.log(`Calculated plagiarism score: ${overallMatchPercentage}%, originality: ${newScore}%`);
     }
   };
   
@@ -1209,10 +1181,6 @@ const ResultsPage: React.FC = () => {
       const apiKey = window.env?.REACT_APP_GOOGLE_API_KEY || config.apiKey;
       const searchEngineId = window.env?.REACT_APP_GOOGLE_SEARCH_ENGINE_ID || config.searchEngineId;
       
-      // Log the actual values being used (without exposing full keys)
-      console.log(`Using API Key: ${apiKey.substring(0, 5)}...${apiKey.substring(apiKey.length - 4)}`);
-      console.log(`Using Search Engine ID: ${searchEngineId.substring(0, 5)}...${searchEngineId.substring(searchEngineId.length - 4)}`);
-      
       // Construct the API URL with parameters
       const url = new URL('https://www.googleapis.com/customsearch/v1');
       url.searchParams.append('key', apiKey);
@@ -1271,9 +1239,6 @@ const ResultsPage: React.FC = () => {
         // Search for the current chunk
         const result = await searchSimilarContent(chunks[i], config, i);
         results.push(result);
-        
-        // Log progress
-        console.log(`Processed chunk ${i + 1}/${chunks.length}`);
         
         // Add delay between requests (except for the last one)
         if (i < chunks.length - 1) {
