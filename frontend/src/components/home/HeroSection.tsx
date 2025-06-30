@@ -26,14 +26,6 @@ const HeroSection: React.FC = () => {
     },
   };
 
-  const trustedPartners = [
-    { name: 'Harvard University', logo: 'https://images.pexels.com/photos/207684/pexels-photo-207684.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1' },
-    { name: 'Stanford University', logo: 'https://images.pexels.com/photos/256417/pexels-photo-256417.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1' },
-    { name: 'MIT', logo: 'https://images.pexels.com/photos/267885/pexels-photo-267885.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1' },
-    { name: 'Oxford University', logo: 'https://images.pexels.com/photos/159490/yale-university-landscape-universities-schools-159490.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1' },
-    { name: 'Cambridge University', logo: 'https://images.pexels.com/photos/159752/books-university-book-read-159752.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1' },
-  ];
-
   return (
     <section className="relative overflow-hidden pt-16 pb-24 md:pt-20 md:pb-32">
       {/* Background glow effects */}
@@ -88,7 +80,7 @@ const HeroSection: React.FC = () => {
           {/* Abstract background animation */}
           <motion.div 
             variants={itemVariants}
-            className="relative w-full max-w-3xl mx-auto aspect-video rounded-2xl overflow-hidden mb-16"
+            className="relative w-full max-w-3xl mx-auto aspect-video rounded-2xl overflow-hidden"
           >
             <div className="absolute inset-0 bg-gradient-to-tr from-primary-900/80 via-primary-800/70 to-accent-900/80 backdrop-blur-sm">
               <div className="w-full h-full flex items-center justify-center">
@@ -97,20 +89,6 @@ const HeroSection: React.FC = () => {
                   <Play className="w-12 h-12 text-white/90" />
                 </div>
               </div>
-            </div>
-          </motion.div>
-          
-          {/* Trusted partners */}
-          <motion.div variants={itemVariants}>
-            <p className="text-dark-500 dark:text-dark-400 text-sm uppercase font-medium tracking-wider mb-6">
-              Trusted by leading organizations
-            </p>
-            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12">
-              {trustedPartners.map((partner, index) => (
-                <div key={index} className="h-10 flex items-center justify-center">
-                  <p className="text-dark-500 dark:text-dark-400">{partner.name}</p>
-                </div>
-              ))}
             </div>
           </motion.div>
         </motion.div>
