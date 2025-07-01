@@ -14,6 +14,7 @@ import {
   Settings,
   Download
 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import api from '../utils/api';
@@ -39,6 +40,7 @@ const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { token } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -195,10 +197,12 @@ const DashboardPage: React.FC = () => {
                   <h2 className="text-xl font-semibold text-dark-800 dark:text-dark-200">
                     Recent Documents
                   </h2>
-                  <Button variant="ghost" size="sm">
-                    View All
-                    <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
+                  <Link to="/documents">
+                    <Button variant="ghost" size="sm">
+                      View All
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </Link>
                 </div>
                 
                 <div className="overflow-x-auto">
@@ -240,14 +244,12 @@ const DashboardPage: React.FC = () => {
                             </span>
                           </td>
                           <td className="py-4">
-                            <div className="flex space-x-2">
-                              <button className="p-1 text-dark-500 hover:text-primary-500 dark:text-dark-400 dark:hover:text-primary-400 transition-colors">
-                                <FileText className="w-4 h-4" />
-                              </button>
-                              <button className="p-1 text-dark-500 hover:text-primary-500 dark:text-dark-400 dark:hover:text-primary-400 transition-colors">
-                                <Download className="w-4 h-4" />
-                              </button>
-                              <button className="p-1 text-dark-500 hover:text-primary-500 dark:text-dark-400 dark:hover:text-primary-400 transition-colors">
+                            <div className="flex justify-end">
+                              <button 
+                                onClick={() => navigate(`/document/${doc.id}/analysis`)}
+                                className="p-2 text-dark-500 hover:text-primary-500 dark:text-dark-400 dark:hover:text-primary-400 transition-colors rounded-lg hover:bg-primary-50 dark:hover:bg-primary-900/20"
+                                title="View Analysis"
+                              >
                                 <BarChart3 className="w-4 h-4" />
                               </button>
                             </div>

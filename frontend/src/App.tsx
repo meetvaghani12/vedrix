@@ -5,6 +5,8 @@ import HomePage from './pages/HomePage';
 import UploadPage from './pages/UploadPage';
 import ResultsPage from './pages/ResultsPage';
 import DashboardPage from './pages/DashboardPage';
+import DocumentsPage from './pages/DocumentsPage';
+import DocumentAnalysisPage from './pages/DocumentAnalysisPage';
 import ContactPage from './pages/ContactPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
@@ -92,6 +94,8 @@ function App() {
             <Route path="upload" element={<UploadPage />} />
             <Route path="results" element={<ResultsPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="documents" element={<DocumentsPage />} />
+            <Route path="document/:id/analysis" element={<DocumentAnalysisPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
           
