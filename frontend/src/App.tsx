@@ -5,7 +5,6 @@ import HomePage from './pages/HomePage';
 import UploadPage from './pages/UploadPage';
 import ResultsPage from './pages/ResultsPage';
 import DashboardPage from './pages/DashboardPage';
-import PricingPage from './pages/PricingPage';
 import ContactPage from './pages/ContactPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
@@ -61,7 +60,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 dark:from-dark-950 dark:to-black transition-colors duration-300 ease-in-out">
+    <div className="min-h-screen bg-gradient-to-br from-white to-gray-100 dark:from-black dark:to-dark-950 transition-colors duration-300 ease-in-out">
       <BackgroundParticles />
       <Routes>
         {/* Mode Selection Route */}
@@ -82,7 +81,7 @@ function App() {
         {/* Public and User Routes */}
         <Route path="/" element={<Layout />}>
           <Route index element={<HomePage />} />
-          <Route path="pricing" element={<PricingPage />} />
+          {/* <Route path="pricing" element={<PricingPage />} /> */}
           <Route path="contact" element={<ContactPage />} />
           <Route path="login" element={<LoginPage />} />
           <Route path="register" element={<RegisterPage />} />

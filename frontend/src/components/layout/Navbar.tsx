@@ -14,10 +14,9 @@ const Navbar: React.FC = () => {
   const { isAuthenticated, logout, user } = useAuth();
 
   const navLinks = [
-    { name: 'Features', path: '/#features' },
+
     { name: 'Upload', path: '/upload' },
     { name: 'Dashboard', path: '/dashboard' },
-    { name: 'Pricing', path: '/pricing' },
     { name: 'Settings', path: '/settings' },
     { name: 'Contact', path: '/contact' },
   ];

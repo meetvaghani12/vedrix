@@ -130,26 +130,7 @@ const SettingsPage: React.FC = () => {
   };
   
   // Plans data
-  const plans = [
-    {
-      name: 'Free',
-      price: '0',
-      features: ['Basic plagiarism detection', '3 documents per month', 'Standard report'],
-      current: true,
-    },
-    {
-      name: 'Pro',
-      price: '9.99',
-      features: ['Advanced plagiarism detection', 'Unlimited documents', 'Detailed reports', 'Priority support'],
-      current: false,
-    },
-    {
-      name: 'Team',
-      price: '29.99',
-      features: ['Everything in Pro', 'Team collaboration', 'API access', 'Custom integration'],
-      current: false,
-    }
-  ];
+
   
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
@@ -186,17 +167,6 @@ const SettingsPage: React.FC = () => {
           >
             <PaintBucket className="inline-block w-5 h-5 mr-2" />
             Appearance
-          </button>
-          <button
-            onClick={() => setActiveTab('plan')}
-            className={`px-4 py-2 font-medium text-lg whitespace-nowrap ${
-              activeTab === 'plan'
-                ? 'text-primary-500 border-b-2 border-primary-500 dark:border-primary-400'
-                : 'text-dark-500 dark:text-dark-400 hover:text-dark-900 dark:hover:text-white'
-            }`}
-          >
-            <CreditCard className="inline-block w-5 h-5 mr-2" />
-            Plan Details
           </button>
         </div>
         
@@ -474,80 +444,6 @@ const SettingsPage: React.FC = () => {
             </motion.div>
           )}
           
-          {/* Plan Details */}
-          {activeTab === 'plan' && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <h2 className="text-2xl font-bold mb-6 text-dark-900 dark:text-white">Plan Details</h2>
-              
-              <div className="mb-8">
-                <div className="bg-gray-50 dark:bg-dark-700 p-6 rounded-xl">
-                  {plans.map(plan => (
-                    plan.current && (
-                      <div key={plan.name} className="flex items-center">
-                        <div className="flex-1">
-                          <h3 className="text-xl font-bold text-dark-900 dark:text-white mb-2">
-                            Your Current Plan: {plan.name}
-                          </h3>
-                          <p className="text-dark-500 dark:text-dark-400">
-                            ${plan.price}/month
-                          </p>
-                        </div>
-                        <div>
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                            <CheckCircle className="w-4 h-4 mr-1" />
-                            Active
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  ))}
-                </div>
-              </div>
-              
-              <h3 className="text-xl font-bold mb-4 text-dark-900 dark:text-white">Available Plans</h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {plans.map(plan => (
-                  <div
-                    key={plan.name}
-                    className={`bg-white dark:bg-dark-800 border ${
-                      plan.current 
-                        ? 'border-primary-500 dark:border-primary-500 ring-2 ring-primary-500/30' 
-                        : 'border-gray-200 dark:border-dark-700'
-                    } rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow`}
-                  >
-                    <h4 className="text-xl font-bold text-dark-900 dark:text-white mb-2">{plan.name}</h4>
-                    <p className="text-3xl font-bold text-dark-900 dark:text-white mb-4">
-                      ${plan.price}
-                      <span className="text-sm font-normal text-dark-500 dark:text-dark-400">/month</span>
-                    </p>
-                    
-                    <ul className="space-y-3 mb-6">
-                      {plan.features.map((feature, index) => (
-                        <li key={index} className="flex items-start">
-                          <CheckCircle className="w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                          <span className="text-dark-700 dark:text-dark-300">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    
-                    <Button
-                      variant={plan.current ? 'outline' : 'primary'}
-                      size="lg"
-                      fullWidth
-                      disabled={plan.current}
-                    >
-                      {plan.current ? 'Current Plan' : 'Upgrade'}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
         </div>
       </div>
     </div>

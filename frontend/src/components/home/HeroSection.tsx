@@ -29,8 +29,8 @@ const HeroSection: React.FC = () => {
   return (
     <section className="relative overflow-hidden pt-16 pb-24 md:pt-20 md:pb-32">
       {/* Background glow effects */}
-      <div className="absolute top-1/4 -left-64 w-96 h-96 bg-primary-500/20 rounded-full filter blur-3xl" />
-      <div className="absolute bottom-0 right-0 w-80 h-80 bg-accent-500/20 rounded-full filter blur-3xl" />
+      <div className="absolute top-1/4 -left-64 w-96 h-96 bg-primary-500/10 dark:bg-primary-500/30 rounded-full filter blur-3xl" />
+      <div className="absolute bottom-0 right-0 w-80 h-80 bg-accent-500/10 dark:bg-accent-500/30 rounded-full filter blur-3xl" />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <motion.div
