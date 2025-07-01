@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@react-oauth/google": "^0.12.2",
     "axios": "^1.10.0",
     "chart.js": "^4.4.9",
     "framer-motion": "^11.0.5",
