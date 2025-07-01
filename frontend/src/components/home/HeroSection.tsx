@@ -77,19 +77,22 @@ const HeroSection: React.FC = () => {
             </Button>
           </motion.div>
           
-          {/* Abstract background animation */}
+          {/* Demo video */}
           <motion.div 
             variants={itemVariants}
-            className="relative w-full max-w-3xl mx-auto aspect-video rounded-2xl overflow-hidden"
+            className="relative w-full max-w-3xl mx-auto aspect-video rounded-2xl overflow-hidden shadow-2xl"
           >
-            <div className="absolute inset-0 bg-gradient-to-tr from-primary-900/80 via-primary-800/70 to-accent-900/80 backdrop-blur-sm">
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="w-24 h-24 relative flex items-center justify-center">
-                  <div className="absolute w-full h-full rounded-full border-4 border-t-transparent border-primary-300/50 animate-spin"></div>
-                  <Play className="w-12 h-12 text-white/90" />
-                </div>
-              </div>
-            </div>
+            <video
+              className="w-full h-full object-cover"
+              src="/demo.mp4"
+              autoPlay
+              loop
+              muted
+              controls
+              poster="/video-poster.jpg"
+            >
+              Your browser does not support the video tag.
+            </video>
           </motion.div>
         </motion.div>
       </div>
