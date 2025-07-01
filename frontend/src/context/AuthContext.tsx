@@ -18,6 +18,7 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   login: (username: string, password: string) => Promise<void>;
+  googleLogin: (credential: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<{ requires_verification: boolean; email: string } | void>;
   logout: () => Promise<void>;
   clearError: () => void;
@@ -126,6 +127,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.error('Login error:', err);
         setError('An error occurred during login');
       }
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Google login function
+  const googleLogin = async (credential: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(`${API_URL}/google-login/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ access_token: credential })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        try {
+          const errorData = JSON.parse(errorText);
+          setError(errorData.error || 'Google login failed');
+        } catch {
+          setError('Google login failed');
+        }
+        throw new Error('Google login failed');
+      }
+
+      const data = await response.json();
+      localStorage.setItem('token', data.token);
+      setToken(data.token);
+      if (data.is_admin) {
+        localStorage.setItem('isAdmin', 'true');
+      }
+    } catch (err) {
+      console.error('Google login error:', err);
+      setError('An error occurred during Google login');
       throw err;
     } finally {
       setLoading(false);
@@ -292,6 +333,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         loading,
         error,
         login,
+        googleLogin,
         register,
         logout,
         clearError,

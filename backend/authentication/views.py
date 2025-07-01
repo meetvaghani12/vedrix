@@ -11,6 +11,10 @@ from django.db.models import Count
 from django.db.models.functions import TruncMonth, TruncDay, TruncYear
 from datetime import timedelta
 from django.db import models
+import requests
+import json
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 from .serializers import (
     RegisterSerializer, 
@@ -21,6 +25,9 @@ from .serializers import (
 )
 from .models import OTPVerification, UserProfile, SystemSetting
 from .utils import send_otp_email
+
+# Google OAuth settings
+GOOGLE_CLIENT_ID = "154516501198-7v2nr9sii22ohbhlfifa7n1ihcif3rm4.apps.googleusercontent.com"
 
 # Create your views here.
 
@@ -903,3 +910,63 @@ class UserManagementView(APIView):
             
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class GoogleLoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Get the token from the request
+            token = request.data.get('access_token')
+            if not token:
+                return Response({'error': 'No token provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Verify the token with Google
+            idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), GOOGLE_CLIENT_ID)
+
+            # Get user info from the token
+            email = idinfo['email']
+            given_name = idinfo.get('given_name', '')
+            family_name = idinfo.get('family_name', '')
+            
+            # Try to find existing user
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                # Create new user
+                username = email.split('@')[0]
+                # Make sure username is unique
+                base_username = username
+                counter = 1
+                while User.objects.filter(username=username).exists():
+                    username = f"{base_username}{counter}"
+                    counter += 1
+                
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    first_name=given_name,
+                    last_name=family_name
+                )
+                # Create profile and mark email as verified since it's Google OAuth
+                profile = UserProfile.objects.create(
+                    user=user,
+                    is_email_verified=True
+                )
+
+            # Generate or get token
+            token, _ = Token.objects.get_or_create(user=user)
+
+            return Response({
+                'token': token.key,
+                'user_id': user.pk,
+                'username': user.username,
+                'email': user.email,
+                'is_admin': user.is_staff or user.is_superuser
+            }, status=status.HTTP_200_OK)
+
+        except ValueError as e:
+            # Invalid token
+            return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
