@@ -29,16 +29,16 @@ const ContactPage: React.FC = () => {
     {
       icon: <Mail className="w-5 h-5" />,
       title: "Email Us",
-      details: "support@plaegiguard.com",
+      details: "meetvaghani1238@gmail.com",
       action: "Send an Email",
-      link: "mailto:support@plaegiguard.com"
+      link: "mailto:meetvaghani1238@gmail.com"
     },
     {
       icon: <Phone className="w-5 h-5" />,
       title: "Call Us",
-      details: "+1 (555) 123-4567",
+      details: "+91 95108 80097",
       action: "Make a Call",
-      link: "tel:+15551234567"
+      link: "tel:+919510880097"
     },
     {
       icon: <MessageSquare className="w-5 h-5" />,
@@ -50,7 +50,7 @@ const ContactPage: React.FC = () => {
     {
       icon: <MapPin className="w-5 h-5" />,
       title: "Visit Us",
-      details: "123 Tech Street, San Francisco, CA",
+      details: "Shayona Infotech, Surat, Gujarat, India",
       action: "Get Directions",
       link: "#"
     },
@@ -442,7 +442,7 @@ const ContactPage: React.FC = () => {
               <div className="absolute inset-0 flex items-center justify-center">
                 <MapPin className="w-16 h-16 text-primary-500" />
                 <p className="absolute mt-20 text-dark-800 dark:text-dark-200 font-medium">
-                  123 Tech Street, San Francisco, CA
+                  Shayona Infotech, Surat, Gujarat, India
                 </p>
               </div>
             </div>
