@@ -1339,7 +1339,7 @@ const ResultsPage: React.FC = () => {
       setRateLimitError(null);
       const backendUrl = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/suggestions/generate/`;
       console.log('Fetching suggestions from:', backendUrl);
-      console.log('Sources:', sources);
+      console.log('Original sources:', JSON.stringify(sources, null, 2));
       
       try {
         const token = localStorage.getItem('token');
@@ -1354,16 +1354,60 @@ const ResultsPage: React.FC = () => {
           throw new Error('Document ID not found in session storage');
         }
 
+        // Debug log for each source's matched text
+        sources.forEach((source, index) => {
+          console.log(`Source ${index + 1}:`, {
+            title: source.title,
+            url: source.url,
+            matchedText: source.matchedText,
+            isArray: Array.isArray(source.matchedText),
+            length: source.matchedText?.length
+          });
+        });
+
+        // Filter out sources with empty or invalid matched text
+        const validSources = sources.filter(source => {
+          if (!source.matchedText || !Array.isArray(source.matchedText)) {
+            console.log('Invalid source - matchedText is not an array:', source);
+            return false;
+          }
+          // Filter out empty strings and keep only valid text segments
+          const validSegments = source.matchedText.filter(segment => {
+            const isValid = segment && typeof segment === 'string' && segment.trim().length > 0;
+            if (!isValid) {
+              console.log('Invalid segment:', segment);
+            }
+            return isValid;
+          });
+          console.log(`Source has ${validSegments.length} valid segments out of ${source.matchedText.length}`);
+          return validSegments.length > 0;
+        });
+
+        console.log('Valid sources count:', validSources.length);
+        console.log('Valid sources:', JSON.stringify(validSources, null, 2));
+
+        if (validSources.length === 0) {
+          console.warn('No valid sources found with matched text');
+          setLoadingSuggestions(false);
+          return;
+        }
+
         const requestBody = {
           text: originalText,
           document_id: parseInt(documentId),
-          matched_sources: sources.map(source => ({
-            matchedText: source.matchedText,
-            url: source.url,
-            title: source.title
-          }))
+          matched_sources: validSources.map(source => {
+            const filteredSegments = source.matchedText.filter(segment => 
+              segment && typeof segment === 'string' && segment.trim().length > 0
+            );
+            console.log(`Filtered segments for source ${source.title}:`, filteredSegments);
+            return {
+              matchedText: filteredSegments,
+              url: source.url,
+              title: source.title
+            };
+          })
         };
-        console.log('Request body:', requestBody);
+        console.log('Final request body:', JSON.stringify(requestBody, null, 2));
         
         const response = await fetch(backendUrl, {
           method: 'POST',
