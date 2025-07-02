@@ -9,3 +9,6 @@ python-docx>=1.1.2  # For DOCX text extraction
 drf-yasg[validation]==1.21.10  # For Swagger/OpenAPI docs
 gunicorn>=21.2.0  # For production server
 requests==2.31.0
+google-auth>=2.25.0  # For Google OAuth authentication
+google-auth-httplib2>=0.2.0  # HTTP transport for Google auth
+google-auth-oauthlib>=1.2.0  # OAuth2 flow helper for Google auth
