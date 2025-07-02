@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     # Local apps
     'authentication',
     'document_processor',
+    'suggestions',
 ]
 
 MIDDLEWARE = [
@@ -63,7 +64,11 @@ MIDDLEWARE = [
 ]
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # In production, specify frontend URL
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default=[
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://vedrix.vercel.app'
+], cast=Csv())
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     'DELETE',

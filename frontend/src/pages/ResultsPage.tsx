@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Download, MessageSquare, RotateCcw, Bookmark, BookOpen, FileText, Code, Search } from 'lucide-react';
+import { Download, MessageSquare, RotateCcw, Bookmark, BookOpen, FileText, Code, Search, AlertTriangle } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
@@ -124,14 +124,24 @@ const chunkTextForSimilaritySearch = (
     if (index === 0) return true;
     
     const prevSentence = sentences[index - 1];
+    const currentSentence = sentences[index];
+    
+    // Add null checks
+    if (!prevSentence || !currentSentence) return false;
+    
+    const prevTrimmed = prevSentence.trim();
+    const currentTrimmed = currentSentence.trim();
+    
     // Check if previous sentence ends with a period and current starts with capital
-    return prevSentence.trim().endsWith('.') && 
-           /^[A-Z]/.test(sentences[index].trim());
+    return prevTrimmed.endsWith('.') && /^[A-Z]/.test(currentTrimmed);
   };
   
   // Process sentences into chunks
   for (let i = 0; i < sentences.length; i++) {
-    currentChunk.push(sentences[i]);
+    const sentence = sentences[i];
+    if (!sentence) continue; // Skip null/undefined sentences
+    
+    currentChunk.push(sentence);
     
     // Determine if we should complete the current chunk
     const isLastSentence = i === sentences.length - 1;
@@ -341,6 +351,9 @@ const ResultsPage: React.FC = () => {
   const [configError, setConfigError] = useState<string>('');
   const [showSearchConfig, setShowSearchConfig] = useState<boolean>(false);
   const [searchProgress, setSearchProgress] = useState(0);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
 
   // Load data from session storage or use simulated data
   useEffect(() => {
@@ -1317,6 +1330,182 @@ const ResultsPage: React.FC = () => {
     setShowSearchResults(false);
   };
 
+  // Add new useEffect for fetching suggestions when sources change
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (sources.length === 0) return;
+      
+      setLoadingSuggestions(true);
+      setRateLimitError(null);
+      const backendUrl = `${import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'}/api/suggestions/generate/`;
+      console.log('Fetching suggestions from:', backendUrl);
+      console.log('Sources:', sources);
+      
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('Authentication token not found');
+        }
+
+        // Get document ID from sessionStorage
+        const documentId = sessionStorage.getItem('documentId');
+        
+        if (!documentId) {
+          throw new Error('Document ID not found in session storage');
+        }
+
+        const requestBody = {
+          text: originalText,
+          document_id: parseInt(documentId),
+          matched_sources: sources.map(source => ({
+            matchedText: source.matchedText,
+            url: source.url,
+            title: source.title
+          }))
+        };
+        console.log('Request body:', requestBody);
+        
+        const response = await fetch(backendUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Token ${token}`
+          },
+          body: JSON.stringify(requestBody)
+        });
+
+        console.log('Response status:', response.status);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        const data = await response.json();
+        console.log('Response data:', data);
+
+        if (response.status === 429) {
+          setRateLimitError(data.message || 'API rate limit exceeded. Please try again later.');
+          setSuggestions(data.suggestions || []);
+          return;
+        }
+        
+        if (!response.ok) {
+          throw new Error(`Failed to generate suggestions: ${JSON.stringify(data)}`);
+        }
+        
+        setSuggestions(data.suggestions || []);
+        if (data.rate_limited) {
+          setRateLimitError(data.rate_limit_message);
+        }
+      } catch (error) {
+        console.error('Error details:', error);
+        console.error('Error stack:', error instanceof Error ? error.stack : '');
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    };
+    
+    fetchSuggestions();
+  }, [sources, originalText]);
+
+  // Update the AI suggestions section
+  const renderAISuggestions = () => {
+    if (loadingSuggestions) {
+      return (
+        <div className="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg p-6 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500 mx-auto mb-4" />
+          <p className="text-dark-500 dark:text-dark-400">
+            Generating AI-powered suggestions...
+          </p>
+        </div>
+      );
+    }
+
+    if (rateLimitError) {
+      return (
+        <div className="bg-white dark:bg-dark-900 border border-yellow-200 dark:border-yellow-900 rounded-lg p-6">
+          <div className="flex items-center mb-4">
+            <AlertTriangle className="w-6 h-6 text-yellow-500 mr-2" />
+            <h4 className="font-medium text-dark-700 dark:text-dark-300">
+              Rate Limit Reached
+            </h4>
+          </div>
+          <p className="text-dark-600 dark:text-dark-400 mb-4">
+            {rateLimitError}
+          </p>
+          {suggestions.length > 0 && (
+            <div className="mt-4 p-4 bg-gray-50 dark:bg-dark-800 rounded-lg">
+              <p className="text-sm text-dark-500 dark:text-dark-400 mb-2">
+                Showing previously generated suggestions:
+              </p>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (suggestions.length === 0) {
+      return (
+        <div className="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg p-6 text-center">
+          <Search className="w-12 h-12 text-dark-400 dark:text-dark-600 mx-auto mb-4" />
+          <h4 className="font-medium text-dark-700 dark:text-dark-300 mb-2">
+            No Suggestions Available
+          </h4>
+          <p className="text-dark-500 dark:text-dark-400">
+            No suggestions are needed at this time.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {rateLimitError && (
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
+            <div className="flex items-center">
+              <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                {rateLimitError}
+              </p>
+            </div>
+          </div>
+        )}
+        {suggestions.map((suggestion, index) => (
+          <div key={index} className="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg p-4">
+            <h4 className="font-medium text-dark-700 dark:text-dark-300 mb-2">
+              Paraphrasing Suggestion
+            </h4>
+            <p className="text-dark-600 dark:text-dark-400 mb-3">
+              Consider revising this highlighted text to make it more original:
+            </p>
+            <blockquote className="border-l-4 border-accent-500 pl-3 py-1 mb-3 text-dark-600 dark:text-dark-400 italic">
+              {suggestion.original_text}
+            </blockquote>
+            <div className="bg-secondary-50 dark:bg-secondary-900/20 p-3 rounded-lg border border-secondary-200 dark:border-secondary-800">
+              <p className="text-dark-700 dark:text-dark-300">
+                Suggestion: "{suggestion.paraphrased_text}"
+              </p>
+            </div>
+            <div className="mt-4">
+              <h4 className="font-medium text-dark-700 dark:text-dark-300 mb-2">
+                Citation Recommendation
+              </h4>
+              <div className="bg-primary-50 dark:bg-primary-900/20 p-3 rounded-lg border border-primary-200 dark:border-primary-800">
+                <p className="text-dark-700 dark:text-dark-300 mb-2">
+                  Source: "{suggestion.source_title}"
+                </p>
+                <div className="text-sm text-dark-500 dark:text-dark-400">
+                  {suggestion.citation_text}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 flex justify-end space-x-2">
+              <Button variant="ghost" size="sm">Ignore</Button>
+              <Button variant="primary" size="sm">Apply Changes</Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   if (isLoading || isSearching) {
     return (
       <div className="min-h-[600px] flex items-center justify-center">
@@ -1455,61 +1644,7 @@ const ResultsPage: React.FC = () => {
               <h2 className="text-xl font-semibold text-dark-800 dark:text-dark-200 mb-4">
                 AI-Powered Suggestions
               </h2>
-              {sources.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg p-4">
-                    <h4 className="font-medium text-dark-700 dark:text-dark-300 mb-2">
-                      Paraphrasing Suggestion
-                    </h4>
-                    <p className="text-dark-600 dark:text-dark-400 mb-3">
-                      Consider revising this highlighted sentence to make it more original:
-                    </p>
-                    <blockquote className="border-l-4 border-accent-500 pl-3 py-1 mb-3 text-dark-600 dark:text-dark-400 italic">
-                      {getRandomSentence()}
-                    </blockquote>
-                    <div className="bg-secondary-50 dark:bg-secondary-900/20 p-3 rounded-lg border border-secondary-200 dark:border-secondary-800">
-                      <p className="text-dark-700 dark:text-dark-300">
-                        Suggestion: "{getAlternativeSentence()}"
-                      </p>
-                    </div>
-                    <div className="mt-3 flex justify-end space-x-2">
-                      <Button variant="ghost" size="sm">Ignore</Button>
-                      <Button variant="secondary" size="sm">Apply</Button>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg p-4">
-                    <h4 className="font-medium text-dark-700 dark:text-dark-300 mb-2">
-                      Citation Recommendation
-                    </h4>
-                    <p className="text-dark-600 dark:text-dark-400 mb-3">
-                      Add a citation for the matched content from this source:
-                    </p>
-                    <div className="bg-primary-50 dark:bg-primary-900/20 p-3 rounded-lg border border-primary-200 dark:border-primary-800">
-                      <p className="text-dark-700 dark:text-dark-300 mb-2">
-                        Source: "{sources[0]?.title}"
-                      </p>
-                      <div className="text-sm text-dark-500 dark:text-dark-400">
-                        {getCitationText()}
-                      </div>
-                    </div>
-                    <div className="mt-3 flex justify-end space-x-2">
-                      <Button variant="ghost" size="sm">Ignore</Button>
-                      <Button variant="primary" size="sm">Add Citation</Button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white dark:bg-dark-900 border border-gray-200 dark:border-dark-700 rounded-lg p-6 text-center">
-                  <Search className="w-12 h-12 text-dark-400 dark:text-dark-600 mx-auto mb-4" />
-                  <h4 className="font-medium text-dark-700 dark:text-dark-300 mb-2">
-                    No Matched Sources Found
-                  </h4>
-                  <p className="text-dark-500 dark:text-dark-400">
-                    No similar content was detected in our database. Your content appears to be original.
-                  </p>
-                </div>
-              )}
+              {renderAISuggestions()}
             </Card>
           </div>
 

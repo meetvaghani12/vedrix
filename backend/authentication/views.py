@@ -15,6 +15,7 @@ import requests
 import json
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
+from decouple import config
 
 from .serializers import (
     RegisterSerializer, 
@@ -27,7 +28,7 @@ from .models import OTPVerification, UserProfile, SystemSetting
 from .utils import send_otp_email
 
 # Google OAuth settings
-GOOGLE_CLIENT_ID = "154516501198-7v2nr9sii22ohbhlfifa7n1ihcif3rm4.apps.googleusercontent.com"
+GOOGLE_CLIENT_ID = config('GOOGLE_CLIENT_ID')
 
 # Create your views here.
 

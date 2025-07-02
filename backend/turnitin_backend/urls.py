@@ -39,6 +39,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('authentication.urls')),
     path('api/', include('document_processor.urls')),
+    path('api/', include('suggestions.urls')),
     path('api-auth/', include('rest_framework.urls')),
     # Swagger documentation URLs
     path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
